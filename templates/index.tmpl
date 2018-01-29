@@ -1,0 +1,374 @@
+{{define "index"}}
+{{template "header" .}}
+
+
+<nav class="navbar navbar-default navbar-inverse bg-inverse" >
+
+    <div class="navbar-header">
+        <a class="navbar-brand" style="color: #fecc00" href="#">Yapoki</a>
+    </div>
+
+<header>
+
+
+    <div class="collapse navbar-collapse" >
+
+        <ul class="nav navbar-nav" style = "width:90%">
+            <!--li><a class="tabnav" data-toggle="tab" href="#FrancPanel" id="TabFranc"><select id="TabSelectFranc"></select></a></li-->
+            <li><a class="tabnav" data-toggle="tab" href="#ChainPanel" id="TabChain"><label class="wrap"><select id="TabSelectChain"></select></label></a></li>
+            <li><a class="tabnav hide" data-toggle="tab" href="#OrgPanel" id="TabOrg"><label class="wrap"><select id="TabSelectOrg"></select></label></a></li>
+            <li><a class="tabnav hide" data-toggle="tab" href="#PointPanel" id="TabPoint"><label class="wrap"><select id="TabSelectPoint"></select></label></a></li>
+
+		 	<li class="active" style="float:right;padding-top:13px"><button type="button" id="admin-button"><a class="tabnav" data-toggle="tab" href="#evPanel3" aria-expanded="true">Администрирование</a></button></li>
+        </ul>
+
+    </div><!-- /.navbar-collapse -->
+
+
+</header>
+</nav>
+
+<div class="row">
+  <!--
+    <div class="col-sm-2">
+        <ul id = "left_menu" class="nav navbar navbar-inverse bg-inverse nav_left">
+
+        </ul>
+    </div>
+-->
+    <div class="col-sm-10">
+
+        <div class="tab-content" id="myTabContent">
+            <!-- Панель 1 -->
+            <div id="evPanel1" class="tab-pane fade">
+                <div class="panel panel-default">
+                    <div class="panel-heading"><button type="button" class="btn btn-success add_mt" id="asd123" >Создать связь тип-модификатор</button></div>
+                    <div class="panel-body">
+
+                        <div class="row ">
+
+                            <div class="col-sm-6  pre-scrollable">
+                                <div onclick='tree_toggle(arguments[0])'>
+                                    <div id="chain_ul_test" class="Container">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6  pre-scrollable test">
+                                <div onclick='tree_toggle(arguments[0])'>
+                                    <div id="chain_ul_modes" class = "Container">
+                                    </div>
+                                </div>
+                            </div>
+
+
+
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+
+
+            <!-- Панель 2 -->
+            <div id="evPanel2" class="tab-pane fade">
+
+                <div class="row">
+                    <div class="col-sm-12 pre-scrollable table_height">
+                        <table  class="table  table-striped table-bordered table-hover ">
+                            <thead class="blackhead">
+                            <tr>
+                                <th>id</th>
+                                <th>Описание</th>
+                                <th>Тип</th>
+                                <th>Мод</th>
+                                <th>Действия</th>
+                            </tr>
+                            </thead>
+
+                            <tbody id="table_mt">
+                            </tbody>
+                        </table>
+                    </div>
+
+
+                </div>
+                <div class="row ">
+                    <div class="col-sm-4">
+                    </div>
+                </div>
+
+
+            </div>
+            <div id="evPanel3" class="tab-pane fade active in">
+                <div class="panel panel-info">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Администрирование</h3>
+                    </div>
+                    <div class="panel-body">
+                        Panel content
+                    </div>
+                </div>
+            </div>
+            <!-- Панель 4 Сеть -->
+            <div id="ChainPanel" class="tab-pane fade">
+                <h3>Панель 4 Сеть</h3>
+                <p>Содержимое панели ChainPanel...</p>
+            </div>
+            <!-- Панель 5 Организации -->
+            <div id="OrgPanel" class="tab-pane fade">
+                <h3>Панель 5 Организации</h3>
+                <p>Содержимое панели OrgPanel...</p>
+            </div>
+            <!-- Панель 6 Точки -->
+            <div id="PointPanel" class="tab-pane fade">
+                <h3>Панель 6 Точки</h3>
+					<div class="row">
+						<div class="col-md-12">
+							<select id="select_action_point">
+								<option data-id="ReportSale">Отчет по продажам</option>
+								<option data-id="ReportSaleNew">Отчет по продажам New</option>
+								<option data-id="Cashbox">Кассовый отчёт</option>
+								<option data-id="Operator">По операторам</option>
+								<option data-id="Courier">По курьерам</option>
+								<option data-id="Rashod">Расход</option>
+								<option data-id="Prixod">Приход</option>
+								<option data-id="Spisanie">Списания</option>
+							</select>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-md-6">
+							<br><br>
+							<!-- <input type="date" id="filter_date" > -->
+							<!-- <button id="btn_action_filter">  Вывод </button> -->
+							<!-- <br><br> -->
+							<input type="date" id="filter_date_start">
+							<input type="date" id="filter_date_end">
+							<button id="btn_action_filter_interval" > Вывод </button>
+      
+						</div>
+						<div class="col-md-3">
+							<div> Количество заказов: <span id="point_order_count"> </span></div>
+							<div> Средний чек: <span id="point_middle_price"> </span></div>
+							<div> Отказов:<span id="point_count_refusals"></span> <button class="" id="point_count_refusals_btn"> отменённые заказы по всем точкам  </button> </div> 
+							<div> Со списанием: <span id="point_write_offs"> </span>&nbsp;&nbsp;&nbsp;Без списания: <span id="point_without_cancellation"> </span></div>
+							<div id="ReportSale"> <span id="Report_Text_Sale"> Общая сумма продаж: </span><span id="sum_orders"> </span></div>
+							<div> <span id="Report_Text_Sale"> Общая себестоимость: </span><span id="sum_realfoodcost"> </span></div>
+							<div id="ReportSert" class="hidden"> Количество сертификатов&nbsp;<span id="sert_count_orders"></span>&nbsp;, на сумму:<span id="sert_orders"></span><br>
+							Внесения &nbsp;<span id="cash_count_plus"></span><br>
+							Изъятия  &nbsp;<span id="cash_count_minus"></span></div>
+						</div>
+						<div id="up-right-right" class="col-md-3">
+						</div>
+					</div>
+					<br>
+					<div class="row-fluid display-none" id="table_report">
+						<div class="panel panel-default">
+							<table class="table table-striped table-hover table-fixed scroll">
+								<thead>
+									<tr>
+
+									</tr>
+								</thead>
+								<tbody>
+
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="row" id="data_dop_html">
+						
+					</div>
+						
+					</div>
+
+            </div>
+   		  	<!-- Панель 7 Точки -->
+            <div id="SkladPanel" class="tab-pane fade">
+                <h3>Заголовок панели SkladPanel</h3>
+                <p>Содержимое панели SkladPanel...</p>
+            </div>
+
+        </div>
+    </div>
+    <div class="col-sm-2" id="newpost" style="display:none;">
+        <ul id = "left_menu" class="nav navbar navbar-inverse bg-inverse nav_left">
+
+        </ul>
+    </div>
+</div>
+
+
+
+
+        <!-- Modal save -->
+<div class="modal fade bd-example-modal-sm" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+<div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="myModalLabel">Добавить дочерний тип</h4>
+        </div>
+
+        <div class="modal-body">
+
+            <form>
+                <div class="form-group">
+                    <label  class="form-control-label">Название нового типа или модификатора:</label>
+                    <input type="text" class="form-control" id="ex1">
+                </div>
+            </form>
+
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Отмена</button>
+            <button type="button" id="asd123s" class="btn btn-primary save">Сохранить</button>
+        </div>
+
+    </div>
+</div>
+</div>
+        <!-- Modal save -->
+
+        <!-- Modal edit info-->
+<div class="modal fade" id="ModalEditInfo" tabindex="76" role="dialog" aria-labelledby="ModalEditInfoLabel1">
+    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="ModalEditInfoLabel1">Редактирование описание</h4>
+        </div>
+
+        <div class="modal-body">
+
+            <form>
+                <div class="form-group">
+                    <label class="form-control-label">Описание связки:</label>
+                    <input type="text" class="form-control" id="edit_info_text">
+                    <label  class="form-control-label classtype" >Тип:</label>
+                    <br>
+                    <label  class="form-control-label classmode" >Мод:</label>
+                    <br>
+                    <label class="form-control-label Tab_Name" >Tab_Name:</label><br>
+                </div>
+            </form>
+            <label class="form-control-label" >Выберите новую связку тип-мод:</label>
+            <div class="panel-body">
+                <div class="row well">
+
+                    <div class="col-sm-6 pre-scrollable">
+                        <div onclick='tree_toggle(arguments[0])'>
+                            <ul id="chain_ul_test2" class="Container">
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="col-sm-6 pre-scrollable test">
+                        <div onclick='tree_toggle(arguments[0])'>
+                            <ul id="chain_ul_modes2" class = "Container">
+                            </ul>
+                        </div>
+                    </div>
+
+
+
+                </div>
+            </div>
+
+
+
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Отмена</button>
+            <button type="button" id="rrr" class="btn btn-primary save_mt">Сохранить</button>
+        </div>
+
+    </div>
+</div>
+</div>
+        <!-- Modal edit info -->
+
+
+        <!-- Modal add info-->
+<div class="modal fade bd-example-modal-sm" id="ModalAddInfo" tabindex="66" role="dialog" aria-labelledby="ModalAddInfoLabel">
+<div class="modal-dialog modal-sm" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="ModalAddInfoLabel">Добавить описание</h4>
+        </div>
+
+        <div class="modal-body">
+
+            <form>
+                <div class="form-group">
+                    <label for="recipient-name" class="form-control-label">Описание связки:</label>
+                    <input type="text" class="form-control" id="add_info_text">
+                </div>
+            </form>
+
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Отмена</button>
+            <button type="button" id="0" class="btn btn-primary add_mt_info">Сохранить</button>
+        </div>
+
+    </div>
+</div>
+</div>
+        <!-- Modal add info -->
+
+
+
+        <!-- Modal cancel -->
+<div class="modal fade bd-example-modal-lg" id="myModalCancel" tabindex="-1" role="dialog">
+<div class="modal-dialog modal-lg" role="document" style="width: 80%;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="modal_title_canc">Отменённые заказы </h4>
+        </div>
+
+        <div class="modal-body">
+                <div class="row" id="canc" style = " padding: 10px;   max-height: 75%; overflow-y: scroll;">
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-success" data-dismiss="modal">Закрыть</button>
+        </div>
+
+    </div>
+</div>
+</div>
+        <!-- Modal cancel -->
+
+
+
+        <!-- Modal So Spisaniem -->
+<div class="modal fade bd-example-modal-lg" style="background-color: rgba(0, 0, 0, 0.5);" id="myModalSoSpisaniem" tabindex="-1" role="dialog">
+<div class="modal-dialog modal-lg" role="document" style="width: 40%;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="modal_title_sospisaniem"> Списанные продукты </h4>
+        </div>
+
+        <div class="modal-body">
+                <div class="row" id="spisano" style = " padding: 10px;   max-height: 75%; overflow-y: scroll;">
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-success" onclick="hidemodalsospisaniem()">Закрыть</button>
+        </div>
+
+    </div>
+</div>
+</div>
+        <!-- Modal So Spisaniem -->
+
+
+
+        {{template "footer" .}}
+{{end}}
