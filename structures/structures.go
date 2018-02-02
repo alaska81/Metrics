@@ -53,6 +53,16 @@ type Metrics_add_info struct {
 	Real_food_cost float64
 }
 
+type ReportSale struct {
+	Name           string
+	Type_id        int64
+	Type_name      string
+	Price          float64
+	Price_id       float64
+	Count          float64
+	Real_food_cost float64
+}
+
 type Result_summ struct {
 	Val float64
 }
@@ -63,6 +73,9 @@ type BD_READ interface {
 
 func (mai *Metrics_add_info) Record(rows *sql.Rows) error {
 	return rows.Scan(&mai.Hash, &mai.Name, &mai.Type_id, &mai.Type_name, &mai.Units, &mai.Price, &mai.Price_id, &mai.Status_id, &mai.Count, &mai.Real_food_cost)
+}
+func (mai *ReportSale) Record(rows *sql.Rows) error {
+	return rows.Scan(&mai.Name, &mai.Type_id, &mai.Type_name, &mai.Price, &mai.Price_id, &mai.Count, &mai.Real_food_cost)
 }
 func (s *Result_summ) Record(rows *sql.Rows) error {
 	return rows.Scan(&s.Val)
@@ -221,6 +234,7 @@ type GetDataForMetricsOrdersLists struct {
 	Count            float64
 	Point_hash       string
 	Order_time       time.Time
+	Over_status_id   int64
 }
 
 type FoodCost struct {

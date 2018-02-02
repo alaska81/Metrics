@@ -156,8 +156,11 @@ func Select(m *structures.Message, index int) error {
 	//		m.Tables[index].Values = append(m.Tables[index].Values, maps)
 	//	} else {
 	//log.Println(m.Query+"."+m.Tables[index].Name+"."+m.Tables[index].TypeParameter, m.Tables[index].Values)
+	log.Println("Quest m:", m)
+
 	Rows, err := db.Requests.Query(m.Query+"."+m.Tables[index].Name+"."+m.Tables[index].TypeParameter, m.Tables[index].Values...)
 	if err != nil {
+		log.Println("Select db.Requests.Query err", err)
 		return err
 	}
 	defer Rows.Close()
@@ -170,6 +173,8 @@ func Select(m *structures.Message, index int) error {
 		switch m.Tables[index].TypeParameter {
 		case "ReportSaleByInterval":
 			answer = &structures.Metrics_add_info{}
+		case "ReportSaleNewByInterval":
+			answer = &structures.ReportSale{}
 		case "ReportSummaOnTypePaymentsFromCashBox":
 			answer = &structures.Result_summ{}
 		default:
@@ -184,6 +189,7 @@ func Select(m *structures.Message, index int) error {
 	}
 	//	}
 
+	log.Println("Answer m:", m)
 	return nil
 }
 

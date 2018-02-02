@@ -308,8 +308,8 @@ $(document).ready(function(){
 				//console.log('DateStartNew:', DateStartNew.format('yyyy-mm-dd hh:MM:ss'));
 				
 				let TypePayments = 3;
-				TArray.push(JSON.stringify(new Struct_Table("Select", "metrics", "ReportSummaOnTypePaymentsFromCashBox", -1, 99999, 0, [Parameter.ReportSaleNew, Point, DateStartNew.format('yyyy-mm-dd 06:00:00'), DateEndNew.format('yyyy-mm-dd 06:00:00'), TypePayments])));
-				TArray.push(JSON.stringify(new Struct_Table("Select", "metrics", "ReportSaleNewByInterval", -1, 99999, 0, [Parameter.ReportSaleNew, Point, DateStartNew, DateEndNew])));
+				TArray.push(JSON.stringify(new Struct_Table("Select", "metrics", "ReportSummaOnTypePaymentsFromCashBox", -1, 99999, 0, [Point, DateStart, DateEnd, TypePayments])));
+				TArray.push(JSON.stringify(new Struct_Table("Select", "metrics", "ReportSaleNewByInterval", -1, 99999, 0, [Point, DateStart, DateEnd])));
 				Link_action_obj.Select('ReportSaleNew', TArray);
 				
 				break;
@@ -640,12 +640,12 @@ Link_action.prototype.Select = function(Action, TableArray){
 					//console.log("newMap:", newMap)
 
 					// Сертификаты из ReportSummaOnTypePayments
-					let m_ReportSummaOnTypePayments = res['metrics.ReportSummaOnTypePaymentsFromCashBox'];
-					if (m_ReportSummaOnTypePayments !== null) {
-						console.log("m_ReportSummaOnTypePayments: ", m_ReportSummaOnTypePayments)
-						sum_sert = m_ReportSummaOnTypePayments[0];
-						console.log("sum_sert:", sum_sert);
+					let records = res['metrics.ReportSummaOnTypePaymentsFromCashBox'];
+					if(records !== null) {
+						sum_sert = records[0].Val;
+
 					}
+		
 					//---
 
 					sum_orders -= sum_sert;

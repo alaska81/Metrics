@@ -92,9 +92,18 @@ type Metrics_add_info struct {
 	Real_food_cost float64
 }
 
+type ReportSale struct {
+	Name           string
+	Type_id        int64
+	Type_name      string
+	Price          float64
+	Price_id       float64
+	Count          float64
+	Real_food_cost float64
+}
+
 type Result_summ struct {
-	val  string
-	val2 string
+	Val float64
 }
 
 type Metrics_user_info struct {
@@ -357,6 +366,7 @@ type GetDataForMetricsOrdersLists struct {
 	Count            float64
 	Point_hash       string
 	Order_time       time.Time
+	Over_status_id   int64
 }
 
 type GetPendingDate struct {

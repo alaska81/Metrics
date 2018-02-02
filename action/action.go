@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	//"strings"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -193,6 +194,8 @@ func (SM *StartMetrics) StartComponentMetrics() {
 		}
 
 		go func(SMS *postgresql.SMS) {
+			time.Sleep(time.Second * time.Duration(rand.Intn(180)))
+
 			err := Go_Routines(SMS)
 			if err != nil {
 				log.Println("ERROR: ", fmt.Errorf("Go_Routines: %v", err))
@@ -298,7 +301,7 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		//fmt.Println("\nvalue:", values)
 		//fmt.Print(".")
 		fmt.Print("\r")
-		fmt.Printf("%v: %v / %v", SMS.MST.TableName+"."+SMS.MST.TypeParameter, k, len(M.Tables[0].Values))
+		fmt.Printf("%v: %v / %v", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values))
 
 		if err := InsertInDB(SMS, &Transaction, &metrics, values); err != nil {
 			log.Println("InsertInDB:", fmt.Errorf("AddMetricsInDB: %v", err))

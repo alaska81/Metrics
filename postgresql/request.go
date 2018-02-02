@@ -348,14 +348,16 @@ func (T *Transaction) Transaction_Insert_Courier(SELECT_ID interface{}, SMS *SMS
 func (T *Transaction) Transaction_Insert_Cashbox(m *MetricsMetrics, values *GetDataForMetricsCashbox) error {
 	log.Println("\n***Transaction_Insert_Cashbox***")
 
-	if err := T.Transaction_QTTV_One(true, "Select", "metrics_cashbox", "OrderId", m.Id, values.Action_time); err != nil && err.Error() != "sql: no rows in result set" {
-		return err
+	if err := T.Transaction_QTTV_One(true, "Select", "metrics_cashbox", "Order_Id", values.Order_id, values.Action_time); err != nil && err.Error() != "sql: no rows in result set" {
+		return fmt.Errorf("Select.metrics_cashbox: %v", err)
 	}
 	if T.HashData == nil {
-		log.Println(". Вставка. Смена: ", values.CashRegister) //ID
+		log.Println("New: Insert.metrics_cashbox (Order_id): ", values.Order_id)
 		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_cashbox", "", m.Id, values.Order_id, values.CashRegister, values.Action_time, values.UserHash, values.Info, values.Type_payments, values.Cash, values.Date_preorder); err != nil {
-			return err
+			return fmt.Errorf("Insert.metrics_cashbox: %v", err)
 		}
+	} else {
+		log.Println("Already: Insert.metrics_cashbox (Order_id): ", values.Order_id)
 	}
 
 	log.Println("******\n")
@@ -392,8 +394,15 @@ func (T *Transaction) Transaction_Insert_OrdersListInfo(m *MetricsMetrics, value
 		return fmt.Errorf("Select.metrics_orders_list_info: %v", err)
 	}
 	if T.HashData == nil {
+
+		//велосипед для получения food_cost со склада
+		if err := Real_food_cost(values); err != nil {
+			return fmt.Errorf("func Real_food_cost: %v", err)
+		}
+		////
+
 		log.Println("New: Insert.metrics_orders_list_info (Order_id, Id_item): ", values.Order_id, values.Id_item)
-		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_orders_list_info", "", m.Id, values.Order_id, values.Id_item, values.Id_parent_item, values.Price_id, values.Price_name, values.Type_id, values.Cooking_tracker, values.Discount_id, values.Discount_name, values.Discount_percent, values.Price, values.Cook_hash, values.Start_time, values.End_time, values.Fail_id, values.Fail_user_hash, values.Fail_comments, values.Real_foodcost, values.Count, values.Type_name); err != nil {
+		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_orders_list_info", "", m.Id, values.Order_id, values.Id_item, values.Id_parent_item, values.Price_id, values.Price_name, values.Type_id, values.Cooking_tracker, values.Discount_id, values.Discount_name, values.Discount_percent, values.Price, values.Cook_hash, values.Start_time, values.End_time, values.Fail_id, values.Fail_user_hash, values.Fail_comments, values.Real_foodcost, values.Count, values.Type_name, values.Over_status_id); err != nil {
 			return fmt.Errorf("Insert.metrics_orders_list_info: %v", err)
 		}
 	} else {
@@ -759,7 +768,7 @@ func (C *Common) Select_Common(Query, Table, Type string, Value ...interface{}) 
 					}
 				case "ReportSaleNewByInterval":
 					{
-						var M Metrics_add_info
+						var M ReportSale
 						if err = Rows.Scan(&M.Name, &M.Type_id, &M.Type_name, &M.Price, &M.Price_id, &M.Count, &M.Real_food_cost); err != nil {
 							return err
 						}
@@ -768,7 +777,7 @@ func (C *Common) Select_Common(Query, Table, Type string, Value ...interface{}) 
 				case "ReportSummaOnTypePaymentsFromCashBox":
 					{
 						var M Result_summ
-						if err = Rows.Scan(&M.val); err != nil {
+						if err = Rows.Scan(&M.Val); err != nil {
 							return err
 						}
 						C.Data = append(C.Data, M)
@@ -962,13 +971,8 @@ func (mo GetDataForMetricsOrders) Insert(Transaction *Transaction, m *MetricsMet
 
 // *** metrics_orders_list_info ***
 func (mol GetDataForMetricsOrdersLists) Hash() string    { return mol.Point_hash }
-func (mol GetDataForMetricsOrdersLists) Date() time.Time { return mol.Start_time }
+func (mol GetDataForMetricsOrdersLists) Date() time.Time { return mol.Order_time }
 func (mol GetDataForMetricsOrdersLists) Insert(Transaction *Transaction, m *MetricsMetrics) error {
-	//велосипед для получения food_cost со склада
-	if err := Real_food_cost(&mol); err != nil {
-		return fmt.Errorf("func Real_food_cost: %v", err)
-	}
-	////
 	if err := Transaction.Transaction_Insert_OrdersListInfo(m, &mol); err != nil {
 		return fmt.Errorf("Transaction_Insert_OrdersListInfo: %v", err)
 	}
@@ -990,7 +994,7 @@ func Real_food_cost(answer *GetDataForMetricsOrdersLists) error {
 	Q := structures.QueryMessage{Query: "Select", Table: "FoodCost", TypeParameter: "Price_ID"}
 
 	log.Println("Запрос на склад:", Q)
-	fmt.Println("Запрос на склад:", Q)
+	//fmt.Println("Запрос на склад:", Q)
 
 	fc := structures.FoodCost{
 		Date:     fn.FormatDate(answer.Start_time),
@@ -1016,7 +1020,7 @@ func Real_food_cost(answer *GetDataForMetricsOrdersLists) error {
 			answer.Real_foodcost = VAL.(float64)
 
 			log.Println("answer:", answer)
-			fmt.Println("\nanswer:", answer)
+			//fmt.Println("\nanswer:", answer)
 
 			return nil
 		}

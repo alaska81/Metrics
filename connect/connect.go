@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 
 	"MetricsTest/config"
@@ -97,7 +97,7 @@ func SelectMessageOLD(conn *net.Conn, QM, TQM interface{}) (structures.Message, 
 		return Answer, err
 	}
 	reply, err := fn.Read(conn, false)
-	fmt.Println("reply:", string(reply))
+	log.Println("reply:", string(reply))
 	if err := json.Unmarshal([]byte(reply), &Answer); err != nil {
 		return Answer, err
 	}

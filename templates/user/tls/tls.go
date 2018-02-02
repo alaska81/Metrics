@@ -142,7 +142,7 @@ func (u *Usr) Ping() error {
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println("User:", reply)
+	log.Println("User:", reply)
 	return nil
 }
 

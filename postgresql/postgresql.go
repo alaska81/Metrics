@@ -66,14 +66,18 @@ func (dbr *dbRequests) initRequests() error {
 			FROM metrics m 
 			inner join metrics_orders_info moi on m.id = moi.metric_id
 			inner join metrics_orders_list_info moli on moi.order_id = moli.order_id AND moli.id_parent_item = 0
-			WHERE m.parameter_id = $1 AND m.ownhash = $2 AND 
-				((date(moi.date_preorder_cook) = date('0001-01-01') AND date(moi.creator_time) >= date($3) AND date(moi.creator_time) <= (date($4) - interval '1 day'))
-				OR (moi.date_preorder_cook >= $3 AND moi.date_preorder_cook < $4))
+			WHERE (m.ownhash = $1 or $1 = 'all')  AND 
+				((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= (date($2) || ' 06:00:00')::timestamp AND moi.creator_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+				OR (moi.date_preorder_cook >= (date($2) || ' 06:00:00')::timestamp AND moi.date_preorder_cook < (date($3) || ' 06:00:00')::timestamp + interval '1 day'))
 				AND moi.type <> 4
+				AND moli.over_status_id not in (15,16)
+				AND date(moi.cancel_time) = date('0001-01-01')
 			GROUP BY moli.price_name, moli.type_id, moli.type_name, moli.price_id
 			ORDER BY moli.price_name
 			`)
 		//--OR (date(moi.date_preorder_cook) = (date('2018-01-14')+interval '1 day') AND moi.date_preorder_cook::time < '06:00:00'::time)
+		//+interval '1 day' and moi.creator_time::time > '06:00:00'::time
+		//+interval '1 day' and moi.date_preorder_cook::time > '06:00:00'::time
 		if err != nil {
 			return err
 		}
@@ -81,14 +85,20 @@ func (dbr *dbRequests) initRequests() error {
 		dbr.requestsList["Select.metrics.ReportSummaOnTypePaymentsFromCashBox"], err = db.Prepare(`
 			SELECT coalesce(sum(mc.cash), 0)
 			FROM metrics m 
-			inner join metrics_orders_info moi on m.id = moi.metric_id
-			inner join metrics_cashbox mc on moi.order_id = mc.order_id
-			WHERE m.parameter_id = $1 AND m.ownhash = $2 AND 
-				((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= $3 AND moi.creator_time <= $4)
-				OR (moi.date_preorder_cook >= $3 AND moi.date_preorder_cook <= $4))
-				AND moi.type <> 4 
-				AND mc.type_payments = $5
+			inner join metrics_cashbox mc on m.id = mc.metric_id
+			WHERE (m.ownhash = $1 or $1 = 'all') AND 
+				(mc.action_time >= (date($2) || ' 06:00:00')::timestamp and mc.action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+				AND mc.type_payments = $4
 			`)
+		//					SELECT coalesce(sum(mc.cash), 0)
+		//			FROM metrics m
+		//			inner join metrics_orders_info moi on m.id = moi.metric_id
+		//			inner join metrics_cashbox mc on moi.order_id = mc.order_id
+		//			WHERE m.ownhash = $1 AND
+		//				((date(moi.date_preorder_cook) = date('0001-01-01') AND date(moi.creator_time) >= date($2) AND date(moi.creator_time) <= date($3))
+		//				OR (moi.date_preorder_cook >= $2 AND moi.date_preorder_cook < $3))
+		//				AND moi.type <> 4
+		//				AND mc.type_payments = $4
 		if err != nil {
 			return err
 		}
@@ -413,6 +423,10 @@ func (dbr *dbRequests) initRequests() error {
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`); err != nil {
 			return err
 		}
+		if dbr.requestsList["Select.metrics_cashbox.Order_Id"], err = db.Prepare(
+			`SELECT id FROM metrics_cashbox WHERE order_id=$1 AND action_time=$2`); err != nil {
+			return err
+		}
 		if dbr.requestsList["Select.metrics_cashbox."], err = db.Prepare(
 			`SELECT id, metric_id, cashregister, action_time, userhash, info, type_payments, cash, date_preorder 
 				FROM metrics_cashbox`); err != nil {
@@ -468,8 +482,8 @@ func (dbr *dbRequests) initRequests() error {
 	//////////////////////////////////////// metrics_orders_list_info
 	{
 		if dbr.requestsList["Insert.metrics_orders_list_info."], err = db.Prepare(
-			`INSERT INTO metrics_orders_list_info(metric_id, order_id, id_item, id_parent_item, price_id, price_name, type_id, cooking_tracker, discount_id, discount_name, discount_percent, price, cook_hash, start_time, end_time, fail_id, fail_user_hash, fail_comments, real_foodcost, count, type_name)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`); err != nil {
+			`INSERT INTO metrics_orders_list_info(metric_id, order_id, id_item, id_parent_item, price_id, price_name, type_id, cooking_tracker, discount_id, discount_name, discount_percent, price, cook_hash, start_time, end_time, fail_id, fail_user_hash, fail_comments, real_foodcost, count, type_name, over_status_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`); err != nil {
 			return err
 		}
 		if dbr.requestsList["Select.metrics_orders_list_info.IdItem_OrderId"], err = db.Prepare(
