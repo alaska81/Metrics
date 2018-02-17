@@ -12,8 +12,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"MetricsTest/config"
-	"MetricsTest/structures"
+	"MetricsNew/config"
+	"MetricsNew/structures"
 )
 
 func send(sendMessage []byte, conn net.Conn) {

@@ -1,7 +1,7 @@
 package tls
 
 import (
-	"MetricsTest/templates/models"
+	"MetricsNew/templates/models"
 	"time"
 )
 

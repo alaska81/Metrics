@@ -1,14 +1,13 @@
 package tls
 
 import (
-	ConfServis "MetricsTest/config"
-	"MetricsTest/connect"
-	"MetricsTest/templates/models"
-	Conf "MetricsTest/templates/user/config"
+	ConfServis "MetricsNew/config"
+	"MetricsNew/connect"
+	"MetricsNew/templates/models"
+	Conf "MetricsNew/templates/user/config"
 	"crypto/tls"
 
-	"MetricsTest/structures"
-	//	"MetricsTest/action"
+	"MetricsNew/structures"
 
 	"encoding/json"
 	"errors"

@@ -1,12 +1,9 @@
 package postgresql
 
 import (
-	"MetricsTest/structures"
 	"database/sql"
-	"net"
+	"fmt"
 	"time"
-
-	pq "github.com/lib/pq"
 )
 
 /*Глобальный мап работы функции*/
@@ -125,7 +122,12 @@ type Metrics struct {
 }
 
 type Metrics_parameters struct {
-	ID, Interface_ID, Type_Mod_ID, Own_ID, Min_Step_ID, StepType_ID int64
+	ID, ServiceTableId, Type_Mod_ID, Own_ID, Min_Step_ID, StepType_ID int64
+	PendingDate                                                       time.Time
+	PendingId                                                         int64
+	Protocol_version                                                  int
+
+	CountInserted int64
 }
 
 /*Конец красного блока*/
@@ -168,132 +170,14 @@ type Metrics_service_table struct {
 }
 
 /*Конец сервис дата*/
-/*Самостоятельные*/
-type Metrics_franchise_hierarchy struct {
-	ID, Hash, Name, Parent_hash string
-}
-type Metrics_role struct {
-	ID, Hash, Name string
-}
 
-type Metrics_dop_data struct {
-	MFH Metrics_franchise_hierarchy
-	MR  Metrics_role
+//////////////////////////////////////////
+//////////////////////////////////////////
 
-	q          structures.QueryMessage
-	common     Common
-	answerRows []string
-	conn       net.Conn
-	err        error
-}
-
-type Metrics_own struct {
-	ID   int64
-	Name string
-}
-
-type Metrics_cook_time struct {
-	ID                                          int64
-	UserHash, Price_ID                          string
-	Date, MinTime, MidTime, MaxTime             time.Time
-	DateStr, MinTimeStr, MidTimeStr, MaxTimeStr string
-}
-
-/*Конец самостоятельных*/
-/*Повара*/
-type Metrics_cook_count struct {
-	ID       int64
-	UserHash string
-	Step_Id  int64
-	Date     time.Time
-	DateStr  string
-
-	Made    int64
-	SumMade float64
-
-	Fail    int64
-	SumFail float64
-
-	Remake    int64
-	SumRemake float64
-
-	Slow    int64
-	SumSlow float64
-}
-
-type Metrics_cook_prices struct {
-	ID, Cook_count_ID, Price_ID, Status_Id int64
-}
-
-type Metrics_status struct {
-	ID            int64
-	Name, AddInfo string
-}
-
-/*Конец повара*/
-/*Начало оператора*/
-type Metrics_casher_count struct {
-	ID       int64
-	UserHash string
-	Step_ID  int64
-	Date     time.Time
-	DateStr  string
-
-	MadeOrders    int64
-	SumMadeOrders float64
-
-	MadeItems int64
-
-	FailOrders    int64
-	SumFailOrders float64
-
-	CanceledOrders    int64
-	SumCanceledOrders float64
-}
-
-type Metrics_operator_cells_count struct {
-	ID, Metric_ID, MadeCalls, AcceptedCalls, FailCalls, BreakCalls int64
-}
-
-type Metrics_operator_time struct {
-	Order_ID                           int64
-	Cell_ID                            string
-	Answer, FillingOrder, TimeDialogue time.Time
-}
-
-type Metrics_casher_time struct {
-	Order_ID, Casher_ID   int64
-	TimeForOrder          time.Time
-	CountCheckSprinted    int64
-	MidTimeSelectMenu     time.Time
-	Status_ID             int64
-	SumCountCheckSprinted float64
-}
-
-/*Конец оператора*/
-/*На визуалку*/
-//Отчеты
-
-type Metrics_courier_info struct {
-	Hash          string
-	Count         float64
-	ArrayOrdersID pq.Int64Array
-}
-
-type Metrics_cashbox struct {
-	ID, Metric_ID, CashRegister, Type_payments int64
-	Action_time, Date_preorder                 time.Time
-	PointHash, UserHash, Info                  string
-	Cash                                       float64
-
-	Action_timeStr string
-}
-
-//////////////////////////////////////////////////////////////////////////
 type GetDataForMetricsCashbox struct {
 	ID, Order_id, CashRegister, Type_payments int64
 	Action_time, Date_preorder                time.Time
-	PointHash, UserHash, Info                 string
+	PointHash, UserHash, UserName, Info       string
 	Cash                                      float64
 }
 
@@ -374,9 +258,105 @@ type GetPendingDate struct {
 	Min_id   int64
 }
 
+//type GetDataForMetricsHashName struct {  //надо будет привести к этому виду
+//	Metric_id        int64
+//	OwnHash, OwnName string
+//	CreatedTime      time.Time
+//}
+
+type GetDataForMetricsRole struct {
+	Hash          string
+	Name          string
+	Premission    int64
+	TTL           int64
+	ConnectInfo   string
+	CreateTime    time.Time
+	CreateTimeStr string
+	NameInterface string
+	TypeWage      string
+	Salary        float64
+	Deal          float64
+	Rate          float64
+}
+
+type GetDataForMetricsUser struct {
+	Hash        string
+	Name        string
+	RoleHash    string
+	OrgHash     string
+	PhoneNumber string
+}
+
 type MetricsMetrics struct {
 	Id           interface{}
 	Ownhash      string
 	Date         time.Time
 	Parameter_id int64
+}
+
+//////////////////////////////
+
+type FoodCost struct {
+	Date      string
+	Price_ID  float64
+	Count     float64
+	CostPrice float64
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type MetricValues interface {
+	HashMethod() string
+	DateMethod() time.Time
+	Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error
+}
+
+// *** metrics_cashbox ***
+func (mc GetDataForMetricsCashbox) HashMethod() string    { return mc.PointHash }
+func (mc GetDataForMetricsCashbox) DateMethod() time.Time { return mc.Action_time }
+func (mc GetDataForMetricsCashbox) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_Cashbox(SMS, m, &mc); err != nil {
+		return fmt.Errorf("Transaction_Insert_Cashbox: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_orders_info ***
+func (mo GetDataForMetricsOrders) HashMethod() string    { return mo.Point_hash }
+func (mo GetDataForMetricsOrders) DateMethod() time.Time { return mo.Creator_time }
+func (mo GetDataForMetricsOrders) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_OrdersInfo(SMS, m, &mo); err != nil {
+		return fmt.Errorf("Transaction_Insert_OrdersInfo: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_orders_list_info ***
+func (mol GetDataForMetricsOrdersLists) HashMethod() string    { return mol.Point_hash }
+func (mol GetDataForMetricsOrdersLists) DateMethod() time.Time { return mol.Order_time }
+func (mol GetDataForMetricsOrdersLists) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_OrdersListInfo(SMS, m, &mol); err != nil {
+		return fmt.Errorf("Transaction_Insert_OrdersListInfo: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_role ***
+func (v GetDataForMetricsRole) HashMethod() string    { return v.Hash }
+func (v GetDataForMetricsRole) DateMethod() time.Time { return v.CreateTime }
+func (v GetDataForMetricsRole) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_Role(SMS, m, &v); err != nil {
+		return fmt.Errorf("Transaction_Insert_Role: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_user ***
+func (v GetDataForMetricsUser) HashMethod() string    { return v.Hash }
+func (v GetDataForMetricsUser) DateMethod() time.Time { return time.Time{} }
+func (v GetDataForMetricsUser) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_User(SMS, m, &v); err != nil {
+		return fmt.Errorf("Transaction_Insert_User: %v", err)
+	}
+	return nil
 }

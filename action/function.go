@@ -6,8 +6,8 @@ import (
 	"math"
 	"time"
 
-	fn "MetricsTest/function"
-	"MetricsTest/postgresql"
+	fn "MetricsNew/function"
+	"MetricsNew/postgresql"
 )
 
 //Проверка - делать ли ещё 1 итерацию по шагам.

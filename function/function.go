@@ -13,7 +13,7 @@ import (
 	"bytes"
 	"encoding/gob"
 
-	"MetricsTest/structures"
+	"MetricsNew/structures"
 )
 
 //Отправка сообщений

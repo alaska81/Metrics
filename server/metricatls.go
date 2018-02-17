@@ -16,12 +16,11 @@ import (
 	"time"
 	//	"sync"
 
-	"MetricsTest/action"
-	"MetricsTest/config"
-	fn "MetricsTest/function"
-	db "MetricsTest/postgresql"
-	"MetricsTest/routing"
-	"MetricsTest/structures"
+	"MetricsNew/action"
+	"MetricsNew/config"
+	fn "MetricsNew/function"
+	db "MetricsNew/postgresql"
+	"MetricsNew/structures"
 )
 
 var comments bool
@@ -74,7 +73,7 @@ func main() {
 	}
 
 	//Запуск сервера gin
-	go routing.Gin_Start()
+	//go routing.Gin_Start()
 
 	fmt.Println(config.Config.TLS_server + ":" + config.Config.TLS_port)
 
@@ -131,7 +130,8 @@ func handleConnection(conn net.Conn) {
 
 		for key, _ := range Q.Tables {
 			if err := Select(&Q, key); err != nil {
-				fmt.Println("err:", err)
+				fmt.Println("ERROR Select: ", err)
+				log.Println("ERROR Select: ", err)
 				var q structures.Message
 				q.Error.Code, q.Error.Type, q.Error.Description = 1, "json", err.Error()
 				b, _ := json.Marshal(q)
@@ -156,6 +156,12 @@ func Select(m *structures.Message, index int) error {
 	//		m.Tables[index].Values = append(m.Tables[index].Values, maps)
 	//	} else {
 	//log.Println(m.Query+"."+m.Tables[index].Name+"."+m.Tables[index].TypeParameter, m.Tables[index].Values)
+
+	//	if m.Query == "PDF" {
+	//		fmt.Println("*** PDF", m)
+	//		return nil
+	//	}
+
 	log.Println("Quest m:", m)
 
 	Rows, err := db.Requests.Query(m.Query+"."+m.Tables[index].Name+"."+m.Tables[index].TypeParameter, m.Tables[index].Values...)
@@ -171,102 +177,41 @@ func Select(m *structures.Message, index int) error {
 		var answer structures.BD_READ
 
 		switch m.Tables[index].TypeParameter {
-		case "ReportSaleByInterval":
-			answer = &structures.Metrics_add_info{}
 		case "ReportSaleNewByInterval":
 			answer = &structures.ReportSale{}
-		case "ReportSummaOnTypePaymentsFromCashBox":
-			answer = &structures.Result_summ{}
+		case "ReportSummOnTypePayments":
+			answer = &structures.ReportSummOnTypePayments{}
+		case "ReportCashboxNewByInterval":
+			answer = &structures.ReportCashbox{}
+		case "ReportOperatorsNewByInterval":
+			answer = &structures.ReportOperator{}
+		case "ReportCouriersNewByInterval":
+			answer = &structures.ReportCourier{}
+		case "ReportCouriersAddrByInterval":
+			answer = &structures.ReportCourierDetailed{}
+		case "ReportTimeDeliveryByInterval":
+			answer = &structures.ReportTimeDelivery{}
+		case "ReportCancelOrdersNewByInterval":
+			answer = &structures.ReportCancelOrders{}
+		case "ReportOrdersOnTime":
+			answer = &structures.ReportOrdersOnTime{}
 		default:
 			return errors.New("Неизвестная таблица")
 		}
 
 		if err := answer.Record(Rows); err != nil {
-			return err
+			return fmt.Errorf("answer.Record: %v", err)
 		}
 
 		m.Tables[index].Values = append(m.Tables[index].Values, answer)
 	}
 	//	}
 
+	if err := Rows.Err(); err != nil {
+		log.Println("Rows.Err: ", err)
+		fmt.Println("Rows.Err: ", err)
+	}
+
 	log.Println("Answer m:", m)
 	return nil
 }
-
-//func ParseFunction(st *structures.Message) error {
-//	var Transaction postgresql.Transaction
-//	if err := Transaction.Begin(); err != nil {
-//		return err
-//	}
-//	defer Transaction.RollBack()    //val.Name  - это действие // дата, склад, хеш, коунт, total_price (тоже разницу надо)
-//	for _, val := range st.Tables { //Пока тут только склады   //  0 	 1		2	  3			4
-//		fmt.Println("\nst:", st)
-//		if len(val.Values) != 5 {
-//			return errors.New("Не корректное число переданных параметров (надо 5), пришло:" + fmt.Sprint(len(val.Values)))
-//		}
-//		var Values []interface{}
-//		var DateS, Sklad string = val.Values[0].(string), val.Values[1].(string)
-//		var Parameter_ID int64
-//		MAI := postgresql.Metrics_add_info{
-//			Hash:      val.Values[2].(string),
-//			Name:      action.Default,
-//			Units:     action.Default,
-//			Count:     val.Values[3].(float64),
-//			Price:     val.Values[4].(float64),
-//			Price_id:  action.DefaultFloat64,
-//			Status_id: -1,
-//		}
-//		switch val.Name {
-//		case "Rashod":
-//			Parameter_ID = 9
-//		case "Prixod":
-//			Parameter_ID = 10
-//		case "Spisanie":
-//			Parameter_ID = 11
-//		default:
-//			return errors.New("Не известное действие: " + val.Name)
-//		}
-//		Values = append(Values, DateS, Parameter_ID, Sklad)
-//		//date($1) and Parameter_ID=$2 and OwnHash=$3 and Step_ID=3"
-//		if err := Transaction.Transaction_QTTV_One(true, "SelectID", "metrics", "DateStep_idParameter_idMS(3)", Values...); err != nil && err.Error() != postgresql.SQL_NO_ROWS {
-//			return err
-//		}
-//		SELECT_ID := Transaction.HashData
-//		log.Println("SELECT_ID:", SELECT_ID)
-//		if SELECT_ID == nil {
-//			var MDD postgresql.Metrics_dop_data
-//			if err := MDD.Select("Select", "metrics_dop_data", "Franchise_hierarchy", Sklad, DateS[:10]); err != nil {
-//				if err.Error() != postgresql.SQL_NO_ROWS {
-//					return err
-//				}
-//				MDD.MFH.Name, MDD.MFH.Parent_hash = "НЕ ИДЕНТИФИЦИРОВАН", "НЕ ИДЕНТИФИЦИРОВАН"
-//			}
-//			if err := Transaction.Transaction_QTTV_One(true, "Insert", "metrics", "", MDD.MFH.Hash, MDD.MFH.Name, DateS, -1, 3, Parameter_ID); err != nil {
-//				return err
-//			}
-//			if err := Transaction.Transaction_QTTV_One(false, "Insert", "metrics_add_info", "Point", Transaction.HashData, MAI.Hash, MAI.Name, MAI.Count, MAI.Units, MAI.Price, MAI.Price_id, MAI.Status_id); err != nil {
-//				return err
-//			}
-//		} else {
-//			if err := Transaction.Transaction_QTTV_One(true, "Select", "metrics_add_info", "JSONMetric_idHash", SELECT_ID, MAI.Hash); err != nil && err.Error() != postgresql.SQL_NO_ROWS {
-//				return err
-//			}
-//			ADD_INFO_JSON := Transaction.HashData
-//			log.Println("ADD_INFO_ID:", ADD_INFO_JSON)
-//			if ADD_INFO_JSON != nil {
-//				var Metrics_add_info postgresql.Metrics_add_info
-//				if err := json.Unmarshal([]byte(ADD_INFO_JSON.(string)), &Metrics_add_info); err != nil {
-//					return err
-//				}
-//				if err := Transaction.Transaction_QTTV_One(false, "Update", "metrics_add_info", "AddCountPrice", Metrics_add_info.ID, MAI.Count, MAI.Price); err != nil {
-//					return err
-//				}
-//			} else { //																					 metric_id, hash, 		name, 	count, 		units, 	  price, 	 price_id, 	   status_id
-//				if err := Transaction.Transaction_QTTV_One(false, "Insert", "metrics_add_info", "Point", SELECT_ID, MAI.Hash, MAI.Name, MAI.Count, MAI.Units, MAI.Price, MAI.Price_id, MAI.Status_id); err != nil {
-//					return err
-//				}
-//			}
-//		}
-//	}
-//	return Transaction.Commit()
-//}
