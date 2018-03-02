@@ -77,7 +77,7 @@ func (T *Transaction) Transaction_Insert_OrdersListInfo(SMS *SMS, m *MetricsMetr
 		////
 
 		//log.Println("New: Insert.metrics_orders_list_info (Order_id, Id_item): ", values.Order_id, values.Id_item)
-		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_orders_list_info", "", m.Id, values.Order_id, values.Id_item, values.Id_parent_item, values.Price_id, values.Price_name, values.Type_id, values.Cooking_tracker, values.Discount_id, values.Discount_name, values.Discount_percent, values.Price, values.Cook_hash, values.Start_time, values.End_time, values.Fail_id, values.Fail_user_hash, values.Fail_comments, values.Real_foodcost, values.Count, values.Type_name, values.Over_status_id); err != nil {
+		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_orders_list_info", "", m.Id, values.Order_id, values.Id_item, values.Id_parent_item, values.Price_id, values.Price_name, values.Type_id, values.Cooking_tracker, values.Discount_id, values.Discount_name, values.Discount_percent, values.Price, values.Cook_hash, values.Start_time, values.End_time, values.Fail_id, values.Fail_user_hash, values.Fail_comments, values.Real_foodcost, values.Count, values.Type_name, values.Over_status_id, values.Time_cook, values.Time_fry, values.Set); err != nil {
 			return fmt.Errorf("Insert.metrics_orders_list_info: %v", err)
 		}
 
@@ -132,6 +132,54 @@ func (T *Transaction) Transaction_Insert_User(SMS *SMS, m *MetricsMetrics, value
 		SMS.MP.CountInserted++
 	} else {
 		//log.Println("Already: Insert.metrics_hash_name (Hash): ", values.Hash)
+	}
+
+	//log.Println("******\n")
+
+	return nil
+}
+
+//Plan metrics_plan
+func (T *Transaction) Transaction_Insert_Plan(SMS *SMS, m *MetricsMetrics, values *GetDataForMetricsPlan) error {
+	//log.Println("\n***Transaction_Insert_Plan***")
+
+	if err := T.Transaction_QTTV_One(true, "Select", "metrics_plan", "Data_Point_Role", values.PlanDate, values.PointHash, values.RoleHash); err != nil && err.Error() != "sql: no rows in result set" {
+		return fmt.Errorf("Select.metrics_plan: %v", err)
+	}
+	if T.HashData == nil {
+
+		//log.Println("New: Insert.metrics_hash_name (Hash): ", values.Hash)
+		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_plan", "", m.Id, values.PlanDate, values.PointHash, values.RoleHash, values.Counts); err != nil {
+			return fmt.Errorf("Insert.metrics_plan: %v", err)
+		}
+
+		SMS.MP.CountInserted++
+	} else {
+		//log.Println("Already: Insert.metrics_plan (Hash): ", values.Hash)
+	}
+
+	//log.Println("******\n")
+
+	return nil
+}
+
+//Plan metrics_plan
+func (T *Transaction) Transaction_Insert_Point(SMS *SMS, m *MetricsMetrics, values *GetDataForMetricsPoint) error {
+	//log.Println("\n***Transaction_Insert_Point***")
+
+	if err := T.Transaction_QTTV_One(true, "Select", "metrics_hash_name", "Hash", values.Hash); err != nil && err.Error() != "sql: no rows in result set" {
+		return fmt.Errorf("Select.metrics_hash_name: %v", err)
+	}
+	if T.HashData == nil {
+
+		//log.Println("New: Insert.metrics_hash_name (Hash): ", values.Hash)
+		if err := T.Transaction_QTTV_One(false, "Insert", "metrics_hash_name", "", m.Id, values.Hash, values.City+","+values.Street+","+values.House, values.CreateTime); err != nil {
+			return fmt.Errorf("Insert.metrics_hash_name: %v", err)
+		}
+
+		SMS.MP.CountInserted++
+	} else {
+		//log.Println("Already: Insert.metrics_point (Hash): ", values.Hash)
 	}
 
 	//log.Println("******\n")

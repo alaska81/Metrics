@@ -200,6 +200,11 @@ func Go_Routines(SMS *postgresql.SMS) error {
 	// Protocol_version == 1
 	if SMS.MP.Protocol_version == 1 {
 		Q := structures.QueryMessage{Query: SMS.MST.Query, Table: SMS.MST.TableName, TypeParameter: SMS.MST.TypeParameter, Limit: 99999, Offset: 0}
+		// Временно Values по протоколу 1 только для План-Табель PointRoleCountByTime
+		if SMS.MST.ID == 78 {
+			Q.Values = append(Q.Values, SMS.MP.PendingDate)
+		}
+		//---
 		log.Println("Запрос на:", SMS.MS.Name, "; Message:", Q)
 
 		Answer_Message, err := connect.SelectRows(&conn, Q)
@@ -274,6 +279,10 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		values = &postgresql.GetDataForMetricsRole{}
 	case "UserGlobal.":
 		values = &postgresql.GetDataForMetricsUser{}
+	case "Point.All":
+		values = &postgresql.GetDataForMetricsPoint{}
+	case "PointRoleCountByTime.Date":
+		values = &postgresql.GetDataForMetricsPlan{}
 	default:
 		//log.Println("Сбор этой метрики не реализован: ", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
 		return errors.New("Сбор этой метрики не реализован: " + SMS.MST.TableName + "." + SMS.MST.TypeParameter)
@@ -306,20 +315,28 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		//log.Println("value:", values)
 		//fmt.Println("\nvalue:", values)
 		//fmt.Print(".")
-		fmt.Print("\r")
+		fmt.Printf("\r%s\r", "                                                                                ")
 		fmt.Printf("%v: %v / %v | %v / 500", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values), SMS.MP.CountInserted)
 
 		if err := InsertInDB(SMS, &Transaction, &metrics, values); err != nil {
-			//log.Println("InsertInDB:", fmt.Errorf("AddMetricsInDB: %v", err))
+			log.Println("InsertInDB:", fmt.Errorf("AddMetricsInDB: %v", err))
 			return fmt.Errorf("InsertInDB: %v", err)
 		}
 
+		log.Println(values)
+
+		if SMS.MP.PendingDate.String()[:19] < values.DateMethod().String()[:19] {
+			SMS.MP.PendingDate = values.DateMethod()
+		}
+		//fmt.Println("*******", SMS.MP.PendingDate)
+		SMS.MP.PendingId = 0
+
 		if SMS.MP.CountInserted > 500 {
+			fmt.Print(" begin commit")
+
 			if err := Transaction.Commit(); err != nil {
 				return fmt.Errorf("Transaction.Commit: %v", err)
 			}
-
-			fmt.Print(" commit")
 
 			if err := Transaction.Begin(); err != nil {
 				return fmt.Errorf("Transaction.Begin: %v", err)
@@ -333,8 +350,14 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 	fmt.Println("\nUpdate:", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
 
 	///////////
+	//if SMS.MP.Protocol_version == 1 {
+	//SMS.MP.PendingDate = time.Now().AddDate(0,0,-1)
+	//SMS.MP.PendingId = 0
+	//}
+
 	if SMS.MP.Protocol_version == 2 {
 		var PD postgresql.GetPendingDate
+
 		val := M.Tables[1].Values[0]
 		//log.Println("val:", val)
 		if val == nil {
@@ -352,14 +375,15 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		SMS.MP.PendingDate = PD.Min_date
 		SMS.MP.PendingId = PD.Min_id
 
-		// Обновляем инфу в metrics_parameters
-		if err := Transaction.Transaction_QTTV_One(false, "Update", "metrics_parameters", "PendingDateAndId", SMS.MP.ServiceTableId, SMS.MP.PendingDate.String()[:19], SMS.MP.PendingId); err != nil {
-			return fmt.Errorf("Update.metrics_parameters.PendingDateAndId: %v", err)
-		}
-
-		log.Println("Update metrics_parameters:", PD, " для ", SMS.MST.TableName, ".", SMS.MST.TypeParameter)
-		fmt.Println("\nUpdate metrics_parameters:", PD, " для ", SMS.MST.TableName, ".", SMS.MST.TypeParameter)
 	}
+
+	// Обновляем инфу в metrics_parameters
+	if err := Transaction.Transaction_QTTV_One(false, "Update", "metrics_parameters", "PendingDateAndId", SMS.MP.ServiceTableId, SMS.MP.PendingDate.String()[:19], SMS.MP.PendingId); err != nil {
+		return fmt.Errorf("Update.metrics_parameters.PendingDateAndId: %v", err)
+	}
+
+	log.Println("Update metrics_parameters:", SMS.MP.PendingDate.String()[:19], "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
+	fmt.Println("\nUpdate metrics_parameters:", SMS.MP.PendingDate.String()[:19], "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
 
 	/*Конец Транзакции*/
 	if err := Transaction.Commit(); err != nil {

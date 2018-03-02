@@ -37,7 +37,7 @@ func (dbr *dbRequests) initRequests() error {
 		dbr.requestsList["Select.metrics.ReportSaleNewByInterval"], err = db.Prepare(`
 			SELECT moli.price_name, moli.type_id, 
 			coalesce(moli.type_name, ''), 
-			sum(moli.price-(moli.price*moli.discount_percent/100)), moli.price_id, sum(moli.count), sum(moli.real_foodcost)
+			sum(moli.price-floor(moli.price*moli.discount_percent/100)), moli.price_id, sum(moli.count), sum(moli.real_foodcost)
 			FROM metrics m 
 			inner join metrics_orders_info moi on m.id = moi.metric_id
 			inner join metrics_orders_list_info moli on moi.order_id = moli.order_id AND moli.id_parent_item = 0
@@ -56,15 +56,41 @@ func (dbr *dbRequests) initRequests() error {
 		}
 
 		/////////
+		dbr.requestsList["Select.metrics.ReportCashboxNewByInterval"], err = db.Prepare(`
+			SELECT cashregister, action_time, userhash, coalesce(user_name, ''), info, type_payments, cash, date_preorder, order_id <> 0 as is_orders
+			FROM metrics m
+			inner join metrics_cashbox mc on mc.metric_id = m.id
+			WHERE (m.ownhash = $1 or $1 = 'all') AND
+				cashregister in (SELECT cashregister FROM metrics_cashbox WHERE action_time >= (date($2) || ' 06:00:00')::timestamp and action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+			ORDER BY cashregister, action_time
+		`)
+		if err != nil {
+			return fmt.Errorf("Select.metrics.ReportCashboxNewByInterval: %v", err)
+		}
+
+		/////////
 		dbr.requestsList["Select.metrics.ReportSummOnTypePayments"], err = db.Prepare(`
-			SELECT mc.type_payments, count(mc.id), coalesce(sum(mc.cash), 0)
-			FROM metrics m 
-			inner join metrics_cashbox mc on m.id = mc.metric_id
-			WHERE (m.ownhash = $1 or $1 = 'all') AND 
-				(mc.action_time >= (date($2) || ' 06:00:00')::timestamp and mc.action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
-				AND mc.cash > 0
-			GROUP BY mc.type_payments
+			WITH cbox as (
+				SELECT mc.*, mc.order_id <> 0 as is_orders
+				FROM metrics m 
+				INNER JOIN metrics_cashbox mc on m.id = mc.metric_id 
+					AND (mc.action_time >= (date($2) || ' 06:00:00')::timestamp and mc.action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+					AND mc.cash > 0
+				WHERE (m.ownhash = $1 or $1 = 'all')
+			)
+			SELECT cb.type_payments, count(cb.id), coalesce(SUM(cb.cash), 0), cb.is_orders
+			FROM cbox cb 
+
+			GROUP BY cb.type_payments, cb.is_orders
 			`)
+		//			SELECT mc.type_payments, count(mc.id), coalesce(sum(mc.cash), 0)
+		//			FROM metrics m
+		//			inner join metrics_cashbox mc on m.id = mc.metric_id
+		//			WHERE (m.ownhash = $1 or $1 = 'all') AND
+		//				(mc.action_time >= (date($2) || ' 06:00:00')::timestamp and mc.action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+		//				AND mc.cash > 0
+		//			GROUP BY mc.type_payments
+
 		//			SELECT coalesce(sum(mc.cash), 0)
 		//			FROM metrics m
 		//			inner join metrics_orders_info moi on m.id = moi.metric_id
@@ -86,6 +112,7 @@ func (dbr *dbRequests) initRequests() error {
 			LEFT JOIN metrics_hash_name mhn ON mhn.own_hash = moi.courier_hash
 			WHERE (m.ownhash = $1 or $1 = 'all') AND 
 				(moi.courier_start_time >= (date($2) || ' 06:00:00')::timestamp and moi.courier_start_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+				AND date(moi.courier_end_time) <> date('0001-01-01')
 			GROUP BY mhn.own_name, moi.courier_hash
 			ORDER BY count(moi.order_id) DESC
 		`)
@@ -98,10 +125,11 @@ func (dbr *dbRequests) initRequests() error {
 			SELECT coalesce(mhn.own_name,'-'), moi.courier_hash, moi.city, moi.street, moi.house, moi.building, sum(moli.price-(moli.price*moli.discount_percent/100)) as price, extract(epoch from (moi.courier_end_time - moi.courier_start_time)) as time_delivery, extract(epoch from (moi.courier_start_time - moi.collector_time)) as time_taken
 			FROM metrics m 
 			INNER JOIN metrics_orders_info moi ON moi.metric_id = m.id 
-			INNER JOIN metrics_orders_list_info moli on moi.order_id = moli.order_id AND moli.id_parent_item = 0
+			INNER JOIN metrics_orders_list_info moli on moi.order_id = moli.order_id AND moli.set = false
 			LEFT JOIN metrics_hash_name mhn ON mhn.own_hash = moi.courier_hash
 			WHERE (m.ownhash = $1 or $1 = 'all') AND
 				(moi.courier_start_time >= (date($2) || ' 06:00:00')::timestamp and moi.courier_start_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
+				AND date(moi.courier_end_time) <> date('0001-01-01')
 			GROUP BY mhn.own_name, moi.courier_hash, moi.city, moi.street, moi.building, moi.house, time_delivery, time_taken
 			ORDER BY mhn.own_name
 		`)
@@ -117,7 +145,8 @@ func (dbr *dbRequests) initRequests() error {
 			LEFT JOIN metrics_hash_name mhn ON mhn.own_hash = moi.courier_hash
 			WHERE (m.ownhash = $1 or $1 = 'all') AND
 				(moi.courier_start_time >= (date($2) || ' 06:00:00')::timestamp and moi.courier_start_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
-				AND moi.date_preorder_cook = date('0001-01-01')
+				AND date(moi.date_preorder_cook) = date('0001-01-01')
+				AND date(moi.courier_end_time) <> date('0001-01-01')
 		`)
 		if err != nil {
 			return fmt.Errorf("Select.metrics.ReportTimeDeliveryByInterval: %v", err)
@@ -136,19 +165,6 @@ func (dbr *dbRequests) initRequests() error {
 		`)
 		if err != nil {
 			return fmt.Errorf("Select.metrics.ReportOperatorsNewByInterval: %v", err)
-		}
-
-		/////////
-		dbr.requestsList["Select.metrics.ReportCashboxNewByInterval"], err = db.Prepare(`
-			SELECT cashregister, action_time, userhash, coalesce(user_name, ''), info, type_payments, cash, date_preorder
-			FROM metrics m
-			inner join metrics_cashbox mc on mc.metric_id = m.id
-			WHERE (m.ownhash = $1 or $1 = 'all') 
-				and cashregister in (SELECT cashregister FROM metrics_cashbox WHERE action_time >= (date($2) || ' 06:00:00')::timestamp and action_time <= (date($3) || ' 06:00:00')::timestamp + interval '1 day')
-			ORDER BY cashregister, action_time
-		`)
-		if err != nil {
-			return fmt.Errorf("Select.metrics.ReportCashboxNewByInterval: %v", err)
 		}
 
 		/////////
@@ -183,21 +199,21 @@ func (dbr *dbRequests) initRequests() error {
 		dbr.requestsList["Select.metrics.ReportOrdersOnTime"], err = db.Prepare(`
 			WITH timeparts as (
 				SELECT hours
-				FROM generate_series ((date($2) || ' 00:00:00')::timestamp, (date($3) || ' 00:00:00')::timestamp + interval '1 day' - interval '1 millisecond', interval '1 hour') as dh(hours)
+				FROM generate_series (date($2)::timestamp, date($3)::timestamp + interval '1 day' - interval '1 millisecond', interval '1 hour') as dh(hours)
 			),
 			orders as (
-				SELECT *
+				SELECT *, (case when date(moi.date_preorder_cook) = date('0001-01-01') then moi.creator_time else moi.date_preorder_cook end) as order_time
 				FROM metrics m
 				INNER JOIN metrics_orders_info moi ON moi.metric_id = m.id 
-				LEFT JOIN metrics_hash_name mhn ON mhn.own_hash = moi.cancel_hash
+				--LEFT JOIN metrics_hash_name mhn ON mhn.own_hash = moi.cancel_hash
 				WHERE (m.ownhash = $1 or $1 = 'all') AND
-					((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= (date($2) || ' 00:00:00')::timestamp AND moi.creator_time <= (date($3) || ' 00:00:00')::timestamp + interval '1 day')
-				OR (moi.date_preorder_cook >= (date($2) || ' 00:00:00')::timestamp AND moi.date_preorder_cook < (date($3) || ' 00:00:00')::timestamp + interval '1 day'))
+					((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= date($2)::timestamp AND moi.creator_time <= date($3)::timestamp + interval '1 day')
+				OR (moi.date_preorder_cook >= date($2)::timestamp AND moi.date_preorder_cook <= date($3)::timestamp + interval '1 day'))
 			)
 			
 			SELECT tp.hours::date as dates, tp.hours::time as times, COUNT(o.order_id), COUNT(NULLIF(date(o.date_preorder_cook) = date('0001-01-01'), TRUE)) as preorders, COUNT(NULLIF(o.type = 1, FALSE)) as delivery, COUNT(NULLIF(o.type = 2, FALSE)) as takeout
 			FROM timeparts tp
-			LEFT JOIN orders o ON (o.creator_time::date = tp.hours::date AND o.creator_time::time >= tp.hours::time AND o.creator_time::time < tp.hours::time + interval '1 hour')
+			LEFT JOIN orders o ON (o.order_time::date = tp.hours::date AND o.order_time::time >= tp.hours::time AND o.order_time::time < tp.hours::time + interval '1 hour')
 			GROUP BY dates, times
 			ORDER BY dates, times
 		`)
@@ -206,6 +222,133 @@ func (dbr *dbRequests) initRequests() error {
 			return fmt.Errorf("Select.metrics.ReportOrdersOnTime: %v", err)
 		}
 
+		/////////
+		dbr.requestsList["Select.metrics.ReportPredictCouriersOnTime"], err = db.Prepare(`
+			WITH timeparts as (
+				SELECT hours
+				FROM generate_series (date($2)::timestamp, date($3)::timestamp + interval '1 day' - interval '1 millisecond', interval '1 hour') as dh(hours)
+			),
+			orders as (
+				SELECT *
+				FROM metrics m
+				INNER JOIN metrics_orders_info moi ON moi.metric_id = m.id 
+				WHERE (m.ownhash = $1 or $1 = 'all') AND
+				(
+					   ((moi.collector_time >= date($2)::timestamp - interval '7 day' AND moi.collector_time <= date($3)::timestamp - interval '6 day'))
+					OR ((moi.collector_time >= date($2)::timestamp - interval '14 day' AND moi.collector_time <= date($3)::timestamp - interval '13 day'))
+					OR ((moi.collector_time >= date($2)::timestamp - interval '28 day' AND moi.collector_time <= date($3)::timestamp - interval '27 day'))
+				)
+				AND moi.type = 2
+			)
+			
+			SELECT tp.hours::date as dates, tp.hours::time as times, ceil(COUNT(o.order_id)/3::float)
+			FROM timeparts tp
+			LEFT JOIN orders o ON ((o.collector_time::date = tp.hours::date - interval '7 day' OR o.collector_time::date = tp.hours::date - interval '14 day' OR o.collector_time::date = tp.hours::date - interval '28 day') AND o.collector_time::time >= tp.hours::time AND o.collector_time::time < tp.hours::time + interval '1 hour')
+			GROUP BY dates, times
+			ORDER BY dates, times
+		`)
+		if err != nil {
+			return fmt.Errorf("Select.metrics.ReportPredictCouriersOnTime: %v", err)
+		}
+
+		/////////
+		dbr.requestsList["Select.metrics.ReportPredictCollectorOnTime"], err = db.Prepare(`
+			WITH timeparts as (
+				SELECT hours
+				FROM generate_series (date($2)::timestamp, date($3)::timestamp + interval '1 day' - interval '1 millisecond', interval '1 hour') as dh(hours)
+			),
+			orders as (
+				SELECT order_id, (case when date(moi.date_preorder_cook) = date('0001-01-01') then moi.creator_time else moi.date_preorder_cook end) as order_time
+				FROM metrics m
+				INNER JOIN metrics_orders_info moi ON moi.metric_id = m.id 
+				WHERE (m.ownhash = $1 or $1 = 'all') AND
+				(
+					((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= date($2)::timestamp - interval '7 day' AND moi.creator_time <= date($3)::timestamp - interval '6 day')
+					OR (moi.date_preorder_cook >= date($2)::timestamp - interval '7 day' AND moi.date_preorder_cook <= date($3)::timestamp - interval '6 day'))
+				 OR ((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= date($2)::timestamp - interval '14 day' AND moi.creator_time <= date($3)::timestamp - interval '13 day')
+					OR (moi.date_preorder_cook >= date($2)::timestamp - interval '14 day' AND moi.date_preorder_cook <= date($3)::timestamp - interval '13 day'))
+				 OR ((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= date($2)::timestamp - interval '1 month' AND moi.creator_time <= date($3)::timestamp - interval '1 month' + interval '1 day')
+					OR (moi.date_preorder_cook >= date($2)::timestamp - interval '28 day' AND moi.date_preorder_cook <= date($3)::timestamp - interval '27 day'))
+				)
+			)
+			
+			SELECT tp.hours::date as dates, tp.hours::time as times, ceil(COUNT(o.order_id)/3::float)
+			FROM timeparts tp
+			LEFT JOIN orders o ON ((o.order_time::date = tp.hours::date - interval '7 day' OR o.order_time::date = tp.hours::date - interval '14 day' OR o.order_time::date = tp.hours::date - interval '28 day') AND o.order_time::time >= tp.hours::time AND o.order_time::time < tp.hours::time + interval '1 hour')
+			GROUP BY dates, times
+			ORDER BY dates, times
+		`)
+		if err != nil {
+			return fmt.Errorf("Select.metrics.ReportPredictCollectorOnTime: %v", err)
+		}
+
+		/////////
+		dbr.requestsList["Select.metrics.ReportAvgTimeRelayOnTime"], err = db.Prepare(`
+			WITH timeparts as (
+				SELECT hours
+				FROM generate_series (date($2)::timestamp, date($3)::timestamp + interval '1 day' - interval '1 millisecond', interval '1 hour') as dh(hours)
+			),
+			orders as (
+				SELECT *, (case when date(moi.date_preorder_cook) = date('0001-01-01') then moi.creator_time else moi.date_preorder_cook end) as order_time
+				FROM metrics m
+				INNER JOIN metrics_orders_info moi ON moi.metric_id = m.id 
+				WHERE (m.ownhash = $1 or $1 = 'all') AND
+				(
+					((date(moi.date_preorder_cook) = date('0001-01-01') AND moi.creator_time >= date($2)::timestamp AND moi.creator_time <= date($3)::timestamp + interval '1 day')
+					OR (moi.date_preorder_cook >= date($2)::timestamp AND moi.date_preorder_cook <= date($3)::timestamp + interval '1 day'))
+				)
+			)
+			
+			SELECT tp.hours::date as dates, tp.hours::time as times, 
+				coalesce(AVG(extract(epoch from (case when date(o.courier_start_time) <> date('0001-01-01') then o.courier_end_time - o.courier_start_time end))), 0) as avg_time_courier, 
+				coalesce(AVG(extract(epoch from (case when date(o.courier_start_time) <> date('0001-01-01') then o.courier_start_time - o.collector_time else o.courier_end_time - o.collector_time end))), 0) as avg_time_transfer
+			FROM timeparts tp
+			LEFT JOIN orders o ON (o.order_time::date = tp.hours::date AND o.order_time::time >= tp.hours::time AND o.order_time::time < tp.hours::time + interval '1 hour' AND date(o.courier_end_time) <> date('0001-01-01'))
+			GROUP BY dates, times
+			ORDER BY dates, times
+		`)
+		if err != nil {
+			return fmt.Errorf("Select.metrics.ReportAvgTimeRelayOnTime: %v", err)
+		}
+
+		/////////
+		dbr.requestsList["Select.metrics.ReportWorkloadOnTime"], err = db.Prepare(`
+			WITH orders as (
+				SELECT *, (case when moli.cooking_tracker = 1 then 1 else 2 end) as cooking_type
+				FROM metrics m
+				INNER JOIN metrics_orders_list_info moli ON moli.metric_id = m.id
+				WHERE (m.ownhash = $1 or $1 = 'all') AND
+				(moli.start_time >= date($2)::timestamp AND moli.start_time <= date($3)::timestamp + interval '1 day')
+				AND moli.cooking_tracker <> 0
+				AND moli.set = false
+			),
+			mplan as (
+				SELECT point_hash, role_hash, plan_date, count_cook, ((row_number() OVER (PARTITION by id) - 1) * interval '30 minute') AS timeparts, 
+					(case when role_hash in ('8746fffb4f2e033aabefa8103e7e4f4d183f0098f1e6513a718c0dcff60be6c2048faaefc6477973c321c8f7c52c96d078c99b188ac2a11a221fb97fa957ccd3') then 1 else 
+						(case when role_hash in ('b6b8c237446b537594a2e1fc44d1d522b0ac62ef3e157e940eb39db9c45deefe151ee05a292e8366127c26901efca3882670d1c53ba11c1169c3c53a71b686c2') then 2 else 3 end) end) as cooking_type
+				FROM (SELECT id, point_hash, role_hash, plan_date, unnest(cook_numbers) AS count_cook FROM metrics_plan WHERE plan_date >= date($2) AND plan_date <= date($3) + interval '1 day' - interval '1 millisecond') t
+				WHERE (point_hash = $1 or $1 = 'all') --AND
+					--role_hash in ('8746fffb4f2e033aabefa8103e7e4f4d183f0098f1e6513a718c0dcff60be6c2048faaefc6477973c321c8f7c52c96d078c99b188ac2a11a221fb97fa957ccd3','b6b8c237446b537594a2e1fc44d1d522b0ac62ef3e157e940eb39db9c45deefe151ee05a292e8366127c26901efca3882670d1c53ba11c1169c3c53a71b686c2')
+				ORDER BY plan_date, timeparts
+			)
+			
+			SELECT mp.cooking_type, mp.plan_date::date as dates, mp.timeparts::time as times, mp.point_hash, coalesce(mhn_point.own_name,'-') as point_name, sum(mp.count_cook) as count_cook,
+				--(SELECT COUNT(o.id_item) FROM orders o WHERE date(o.start_time) = date(mp.plan_date) AND o.start_time::time >= mp.timeparts::time AND o.start_time::time < mp.timeparts::time + interval '30 minute' AND o.ownhash = mp.point_hash AND o.cooking_type = mp.cooking_type) as count_items,
+				--array(SELECT (o.time_cook) FROM orders o WHERE date(o.start_time) = date(mp.plan_date) AND o.start_time::time >= mp.timeparts::time AND o.start_time::time < mp.timeparts::time + interval '30 minute' AND o.ownhash = mp.point_hash AND o.cooking_type = mp.cooking_type) as aa,
+				(case when sum(mp.count_cook) > 0 then 
+					ceil((SELECT coalesce(SUM(o.time_cook), 0) FROM orders o WHERE date(o.start_time) = date(mp.plan_date) AND o.start_time::time >= mp.timeparts::time AND o.start_time::time < mp.timeparts::time + interval '30 minute' AND o.ownhash = mp.point_hash AND o.cooking_type = mp.cooking_type) / (sum(mp.count_cook) * 30 * 60) * 100) 
+					else ceil((SELECT coalesce(SUM(o.time_cook), 0) FROM orders o WHERE date(o.start_time) = date(mp.plan_date) AND o.start_time::time >= mp.timeparts::time AND o.start_time::time < mp.timeparts::time + interval '30 minute' AND o.ownhash = mp.point_hash AND o.cooking_type = mp.cooking_type) / 1800 * 100) 
+				end) as workload
+			FROM mplan mp
+			--LEFT JOIN metrics_hash_name mhn_role ON mhn_role.own_hash = mp.role_hash
+			LEFT JOIN metrics_hash_name mhn_point ON mhn_point.own_hash = mp.point_hash
+			WHERE mp.cooking_type in (1, 2)
+			GROUP BY mp.point_hash, mhn_point.own_name, dates, times, mp.plan_date, mp.timeparts, mp.cooking_type
+			ORDER BY mp.cooking_type, dates, times, point_hash
+		`)
+		if err != nil {
+			return fmt.Errorf("Select.metrics.ReportWorkloadOnTime: %v", err)
+		}
 		///////////////////////
 		/* Конец ДЛЯ АДМИНКИ */
 		///////////////////////
@@ -273,6 +416,21 @@ func (dbr *dbRequests) initRequests() error {
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////// metrics_orders_list_info
+	{
+		if dbr.requestsList["Insert.metrics_orders_list_info."], err = db.Prepare(
+			`INSERT INTO metrics_orders_list_info(metric_id, order_id, id_item, id_parent_item, price_id, price_name, type_id, cooking_tracker, discount_id, discount_name, discount_percent, price, cook_hash, start_time, end_time, fail_id, fail_user_hash, fail_comments, real_foodcost, count, type_name, over_status_id, time_cook, time_fry, set)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`); err != nil {
+			return fmt.Errorf("Insert.metrics_orders_list_info.: %v", err)
+		}
+		if dbr.requestsList["Select.metrics_orders_list_info.IdItem_OrderId"], err = db.Prepare(
+			`SELECT id FROM metrics_orders_list_info WHERE id_item = $1 and order_id = $2`); err != nil {
+			return fmt.Errorf("Select.metrics_orders_list_info.IdItem_OrderId: %v", err)
+		}
+	}
+	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////// metrics_hash_name
 	{
 		if dbr.requestsList["Insert.metrics_hash_name."], err = db.Prepare(
@@ -288,19 +446,18 @@ func (dbr *dbRequests) initRequests() error {
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////// metrics_orders_list_info
+	//////////////////////////////////////// metrics_plan
 	{
-		if dbr.requestsList["Insert.metrics_orders_list_info."], err = db.Prepare(
-			`INSERT INTO metrics_orders_list_info(metric_id, order_id, id_item, id_parent_item, price_id, price_name, type_id, cooking_tracker, discount_id, discount_name, discount_percent, price, cook_hash, start_time, end_time, fail_id, fail_user_hash, fail_comments, real_foodcost, count, type_name, over_status_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`); err != nil {
-			return fmt.Errorf("Insert.metrics_orders_list_info.: %v", err)
+		if dbr.requestsList["Insert.metrics_plan."], err = db.Prepare(
+			`INSERT INTO metrics_plan(metric_id, plan_date, point_hash, role_hash, cook_numbers)
+			VALUES ($1, $2, $3, $4, $5)`); err != nil {
+			return fmt.Errorf("Insert.metrics_plan.: %v", err)
 		}
-		if dbr.requestsList["Select.metrics_orders_list_info.IdItem_OrderId"], err = db.Prepare(
-			`SELECT id FROM metrics_orders_list_info WHERE id_item = $1 and order_id = $2`); err != nil {
-			return fmt.Errorf("Select.metrics_orders_list_info.IdItem_OrderId: %v", err)
+		if dbr.requestsList["Select.metrics_plan.Data_Point_Role"], err = db.Prepare(
+			`SELECT id FROM metrics_plan WHERE plan_date = $1 AND point_hash = $2 AND role_hash = $3`); err != nil {
+			return fmt.Errorf("Select.metrics_plan.Data_Point: %v", err)
 		}
 	}
-
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////

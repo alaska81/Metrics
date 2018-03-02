@@ -68,6 +68,7 @@ type ReportCashbox struct {
 	Action_time, Date_preorder  time.Time
 	UserHash, UserName, Info    string
 	Cash                        float64
+	IsOrder                     bool
 
 	Action_timeStr string
 }
@@ -76,6 +77,7 @@ type ReportSummOnTypePayments struct {
 	TypePayment   int64
 	CountPayments int64
 	Summa         float64
+	IsOrder       bool
 }
 
 type ReportOperator struct {
@@ -126,6 +128,35 @@ type ReportOrdersOnTime struct {
 	CountTakeout   int64
 }
 
+type ReportPredictCouriersOnTime struct {
+	Dates         time.Time
+	Times         time.Time
+	CountCouriers int64
+}
+
+type ReportPredictCollectorOnTime struct {
+	Dates           time.Time
+	Times           time.Time
+	CountCollectors int64
+}
+
+type ReportAvgTimeRelayOnTime struct {
+	Dates           time.Time
+	Times           time.Time
+	AvgTimeCourier  string
+	AvgTimeTransfer string
+}
+
+type ReportWorkloadOnTime struct {
+	CookingType int64
+	PointHash   string
+	PointName   string
+	Dates       time.Time
+	Times       time.Time
+	CountCook   int64
+	Workload    int64
+}
+
 //type Result_summ struct {
 //	Val float64
 //}
@@ -141,10 +172,10 @@ func (v *ReportSale) Record(rows *sql.Rows) error {
 	return rows.Scan(&v.Name, &v.Type_id, &v.Type_name, &v.Price, &v.Price_id, &v.Count, &v.Real_food_cost)
 }
 func (v *ReportCashbox) Record(rows *sql.Rows) error {
-	return rows.Scan(&v.CashRegister, &v.Action_time, &v.UserHash, &v.UserName, &v.Info, &v.Type_payments, &v.Cash, &v.Date_preorder)
+	return rows.Scan(&v.CashRegister, &v.Action_time, &v.UserHash, &v.UserName, &v.Info, &v.Type_payments, &v.Cash, &v.Date_preorder, &v.IsOrder)
 }
 func (v *ReportSummOnTypePayments) Record(rows *sql.Rows) error {
-	return rows.Scan(&v.TypePayment, &v.CountPayments, &v.Summa)
+	return rows.Scan(&v.TypePayment, &v.CountPayments, &v.Summa, &v.IsOrder)
 }
 func (v *ReportOperator) Record(rows *sql.Rows) error {
 	return rows.Scan(&v.Name, &v.Hash, &v.Count)
@@ -163,4 +194,16 @@ func (v *ReportCancelOrders) Record(rows *sql.Rows) error {
 }
 func (v *ReportOrdersOnTime) Record(rows *sql.Rows) error {
 	return rows.Scan(&v.Dates, &v.Times, &v.CountOrders, &v.CountPreorders, &v.CountDelivery, &v.CountTakeout)
+}
+func (v *ReportPredictCouriersOnTime) Record(rows *sql.Rows) error {
+	return rows.Scan(&v.Dates, &v.Times, &v.CountCouriers)
+}
+func (v *ReportPredictCollectorOnTime) Record(rows *sql.Rows) error {
+	return rows.Scan(&v.Dates, &v.Times, &v.CountCollectors)
+}
+func (v *ReportAvgTimeRelayOnTime) Record(rows *sql.Rows) error {
+	return rows.Scan(&v.Dates, &v.Times, &v.AvgTimeCourier, &v.AvgTimeTransfer)
+}
+func (v *ReportWorkloadOnTime) Record(rows *sql.Rows) error {
+	return rows.Scan(&v.CookingType, &v.Dates, &v.Times, &v.PointHash, &v.PointName, &v.CountCook, &v.Workload)
 }

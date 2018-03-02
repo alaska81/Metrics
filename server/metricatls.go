@@ -195,6 +195,14 @@ func Select(m *structures.Message, index int) error {
 			answer = &structures.ReportCancelOrders{}
 		case "ReportOrdersOnTime":
 			answer = &structures.ReportOrdersOnTime{}
+		case "ReportPredictCouriersOnTime":
+			answer = &structures.ReportPredictCouriersOnTime{}
+		case "ReportPredictCollectorOnTime":
+			answer = &structures.ReportPredictCollectorOnTime{}
+		case "ReportAvgTimeRelayOnTime":
+			answer = &structures.ReportAvgTimeRelayOnTime{}
+		case "ReportWorkloadOnTime":
+			answer = &structures.ReportWorkloadOnTime{}
 		default:
 			return errors.New("Неизвестная таблица")
 		}

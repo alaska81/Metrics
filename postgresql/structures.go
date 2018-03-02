@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 /*Глобальный мап работы функции*/
@@ -251,6 +253,9 @@ type GetDataForMetricsOrdersLists struct {
 	Point_hash       string
 	Order_time       time.Time
 	Over_status_id   int64
+	Time_cook        int64
+	Time_fry         int64
+	Set              bool
 }
 
 type GetPendingDate struct {
@@ -285,6 +290,27 @@ type GetDataForMetricsUser struct {
 	RoleHash    string
 	OrgHash     string
 	PhoneNumber string
+}
+
+type GetDataForMetricsPoint struct {
+	Hash          string
+	HashOrg       string
+	City          string
+	Street        string
+	House         string
+	CreateTime    time.Time
+	CreateTimeStr string
+	NameSklad     string
+	Active        bool
+	Lat           string
+	Lon           string
+}
+
+type GetDataForMetricsPlan struct {
+	PlanDate  time.Time
+	PointHash string
+	RoleHash  string
+	Counts    pq.Int64Array
 }
 
 type MetricsMetrics struct {
@@ -357,6 +383,26 @@ func (v GetDataForMetricsUser) DateMethod() time.Time { return time.Time{} }
 func (v GetDataForMetricsUser) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
 	if err := Transaction.Transaction_Insert_User(SMS, m, &v); err != nil {
 		return fmt.Errorf("Transaction_Insert_User: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_plan ***
+func (v GetDataForMetricsPlan) HashMethod() string    { return v.PointHash }
+func (v GetDataForMetricsPlan) DateMethod() time.Time { return v.PlanDate }
+func (v GetDataForMetricsPlan) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_Plan(SMS, m, &v); err != nil {
+		return fmt.Errorf("Transaction_Insert_Plan: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_point ***
+func (v GetDataForMetricsPoint) HashMethod() string    { return v.Hash }
+func (v GetDataForMetricsPoint) DateMethod() time.Time { return v.CreateTime }
+func (v GetDataForMetricsPoint) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.Transaction_Insert_Point(SMS, m, &v); err != nil {
+		return fmt.Errorf("Transaction_Insert_Point: %v", err)
 	}
 	return nil
 }
