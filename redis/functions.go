@@ -10,7 +10,9 @@ import (
 var rclient *redis.Client
 
 func init() {
-	connect()
+	if err := connect(); err != nil {
+		fmt.Println(err)
+	}
 
 }
 
@@ -21,28 +23,43 @@ func connect() error {
 		DB:       0,  // use default DB
 	})
 
-	pong, err := rclient.Ping().Result()
-	fmt.Println(pong, err)
-
-	return err
-}
-
-func pushListValue(key string, value string) {
-	err := rclient.RPush(key, value).Err()
+	_, err := rclient.Ping().Result()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("connect: %v", err)
 	}
+
+	return nil
 }
 
-func pushHashValue(key string, field string, value interface{}) {
-	err := rclient.HSet(key, field, value).Err()
+func AddValue(key string, value string) error {
+	err := rclient.SAdd(key, value).Err()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("AddValue: %v", err)
 	}
+
+	return nil
 }
 
-func getHashValue(key string, field string) {
-	val := rclient.HExists(key, field)
+func ExistValue(key string, value string) bool {
+	val := rclient.SIsMember(key, value).Val()
 
 	return val
+}
+
+func DelKey(key string) error {
+	err := rclient.Del(key).Err()
+	if err != nil {
+		return fmt.Errorf("DelKey: %v", err)
+	}
+
+	return nil
+}
+
+func RenameKey(key string, newkey string) error {
+	err := rclient.Rename(key, newkey).Err()
+	if err != nil {
+		return fmt.Errorf("RenameKey: %v", err)
+	}
+
+	return nil
 }
