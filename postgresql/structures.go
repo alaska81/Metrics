@@ -128,6 +128,7 @@ type Metrics_parameters struct {
 	PendingDate                                                       time.Time
 	PendingId                                                         int64
 	Protocol_version                                                  int
+	Update_allow                                                      bool
 
 	CountInserted int64
 }
@@ -226,6 +227,7 @@ type GetDataForMetricsOrders struct {
 	Compensation               bool
 	Type_compensation          int64
 	Type                       int64
+	Customer_phone             string
 }
 
 type GetDataForMetricsOrdersLists struct {
@@ -256,6 +258,7 @@ type GetDataForMetricsOrdersLists struct {
 	Time_cook        int64
 	Time_fry         int64
 	Set              bool
+	Cook_role        string
 }
 
 type GetPendingDate struct {

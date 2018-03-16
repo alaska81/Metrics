@@ -43,6 +43,10 @@ type Configurations struct {
 	Port_Gin     string
 	Word         string
 	Using_Domain string
+
+	Redis_Addr		string
+	Redis_Password	string
+	Redis_DB		int
 }
 
 func (c *Configurations) getConfigurations() error {

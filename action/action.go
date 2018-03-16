@@ -18,6 +18,7 @@ import (
 	"MetricsNew/connect"
 	fn "MetricsNew/function"
 	"MetricsNew/postgresql"
+	"MetricsNew/redis"
 
 	"MetricsNew/structures"
 
@@ -146,12 +147,13 @@ func (SM *StartMetrics) GetTables() error {
 		if err = Rows.Scan(&SMS.MP.Min_Step_ID,
 			&SMS.MSTEP.ID, &SMS.MSTEP.Name, &SMS.MSTEP.Value, &SMS.MSTEP.Duration,
 			&SMS.MSTEPT.ID, &SMS.MSTEPT.Name,
-			&SMS.MP.ID, &SMS.MP.ServiceTableId, &SMS.MP.Type_Mod_ID, &SMS.MP.Own_ID, &SMS.MP.PendingDate, &SMS.MP.PendingId, &SMS.MP.Protocol_version,
+			&SMS.MP.ID, &SMS.MP.ServiceTableId, &SMS.MP.Type_Mod_ID, &SMS.MP.Own_ID, &SMS.MP.PendingDate, &SMS.MP.PendingId, &SMS.MP.Protocol_version, &SMS.MP.Update_allow,
 			&SMS.MST.ID, &SMS.MST.Query, &SMS.MST.TableName, &SMS.MST.TypeParameter, &SMS.MST.Service_ID, &SMS.MST.Activ,
 			&SMS.MS.ID, &SMS.MS.Name, &SMS.MS.IP); err != nil {
 			return err
 		}
-		SM.SMS_ARRAY = append(SM.SMS_ARRAY, SMS) //Узнаем какие метрики с какими шагами существуют
+
+		SM.SMS_ARRAY = append(SM.SMS_ARRAY, SMS)
 		Mutex.AddMutex(SMS.MP.ServiceTableId)
 	}
 	return nil
@@ -256,7 +258,6 @@ func Go_Routines(SMS *postgresql.SMS) error {
 		if err := AddMetricsInDB(SMS, &M); err != nil {
 			return fmt.Errorf("AddMetricsInDB: %v", err)
 		}
-
 	}
 
 	Mutex.Unlock(SMS.MP.ServiceTableId, "local")
@@ -298,6 +299,8 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 	}
 	defer Transaction.RollBack()
 
+	fmt.Println("\nM:", M, "\n")
+
 	//Начинаем бегать по результату ответа
 	for k, val := range M.Tables[0].Values {
 		if val == nil {
@@ -315,23 +318,23 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		//log.Println("value:", values)
 		//fmt.Println("\nvalue:", values)
 		//fmt.Print(".")
-		fmt.Printf("\r%s\r", "                                                                                ")
-		fmt.Printf("%v: %v / %v | %v / 500", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values), SMS.MP.CountInserted)
-
 		if err := InsertInDB(SMS, &Transaction, &metrics, values); err != nil {
 			log.Println("InsertInDB:", fmt.Errorf("AddMetricsInDB: %v", err))
+			fmt.Println("InsertInDB:", fmt.Errorf("AddMetricsInDB: %v", err))
 			return fmt.Errorf("InsertInDB: %v", err)
 		}
 
-		log.Println(values)
+		fmt.Printf("\r%s\r", "                                                                                ")
+		fmt.Printf("%v: %v / %v | %v / 500", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values), SMS.MP.CountInserted)
 
 		if SMS.MP.PendingDate.String()[:19] < values.DateMethod().String()[:19] {
 			SMS.MP.PendingDate = values.DateMethod()
 		}
 		//fmt.Println("*******", SMS.MP.PendingDate)
+
 		SMS.MP.PendingId = 0
 
-		if SMS.MP.CountInserted > 500 {
+		if SMS.MP.CountInserted >= 500 {
 			fmt.Print(" begin commit")
 
 			if err := Transaction.Commit(); err != nil {
@@ -388,6 +391,10 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 	/*Конец Транзакции*/
 	if err := Transaction.Commit(); err != nil {
 		return fmt.Errorf("Transaction.Commit: %v", err)
+	}
+
+	if err := redis.SwitchKeys(SMS.MP.ID); err != nil {
+		return fmt.Errorf("redis.SwitchKeys:(%s) %v", SMS.MP.ID, err)
 	}
 
 	log.Println("*** END", SMS.MST.TableName+"."+SMS.MST.TypeParameter, " Сбор отработан.")

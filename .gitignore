@@ -1,0 +1,6 @@
+server/server.exe
+server/server.exe~
+server/log/*.log
+test/test.exe
+запросы.txt
+~$metrics_info.xlsx

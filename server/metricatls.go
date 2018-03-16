@@ -181,6 +181,12 @@ func Select(m *structures.Message, index int) error {
 			answer = &structures.ReportSale{}
 		case "ReportSummOnTypePayments":
 			answer = &structures.ReportSummOnTypePayments{}
+		case "ReportCashboxPrepayByInterval":
+			answer = &structures.ReportCashboxPrepay{}
+		case "ReportCashboxPostpayByInterval":
+			answer = &structures.ReportCashboxPostpay{}
+		//case "ReportCashboxReturnByInterval":
+		//	answer = &structures.ReportCashboxReturn{}
 		case "ReportCashboxNewByInterval":
 			answer = &structures.ReportCashbox{}
 		case "ReportOperatorsNewByInterval":
@@ -203,8 +209,10 @@ func Select(m *structures.Message, index int) error {
 			answer = &structures.ReportAvgTimeRelayOnTime{}
 		case "ReportWorkloadOnTime":
 			answer = &structures.ReportWorkloadOnTime{}
+		case "ReportCookByInterval":
+			answer = &structures.ReportCook{}
 		default:
-			return errors.New("Неизвестная таблица")
+			return errors.New("Неизвестная таблица: " + m.Tables[index].TypeParameter)
 		}
 
 		if err := answer.Record(Rows); err != nil {
