@@ -124,13 +124,15 @@ type Metrics struct {
 }
 
 type Metrics_parameters struct {
-	ID, ServiceTableId, Type_Mod_ID, Own_ID, Min_Step_ID, StepType_ID int64
-	PendingDate                                                       time.Time
-	PendingId                                                         int64
-	Protocol_version                                                  int
-	Update_allow                                                      bool
+	ID, ServiceTableId, Timeout, Own_ID, Min_Step_ID, StepType_ID int64
+	PendingDate                                                   time.Time
+	PendingId                                                     int64
+	Protocol_version                                              int
+	Update_allow                                                  bool
+	UpdateAt                                                      time.Time
 
 	CountInserted int64
+	Lock          bool
 }
 
 /*Конец красного блока*/
@@ -177,6 +179,15 @@ type Metrics_service_table struct {
 //////////////////////////////////////////
 //////////////////////////////////////////
 
+//MetricsMetrics struct
+type MetricsMetrics struct {
+	Id           interface{}
+	Ownhash      string
+	Date         time.Time
+	Parameter_id int64
+}
+
+//GetDataForMetricsCashbox struct
 type GetDataForMetricsCashbox struct {
 	ID, Order_id, CashRegister, Type_payments int64
 	Action_time, Date_preorder                time.Time
@@ -184,6 +195,7 @@ type GetDataForMetricsCashbox struct {
 	Cash                                      float64
 }
 
+//GetDataForMetricsOrders struct
 type GetDataForMetricsOrders struct {
 	Metric_id                  int64
 	Order_id                   int64
@@ -228,39 +240,45 @@ type GetDataForMetricsOrders struct {
 	Type_compensation          int64
 	Type                       int64
 	Customer_phone             string
+	PriceWithDiscount          float64
+	Division                   string
 }
 
+//GetDataForMetricsOrdersLists struct
 type GetDataForMetricsOrdersLists struct {
-	Metric_id        int64
-	Order_id         int64
-	Id_item          int64
-	Id_parent_item   int64
-	Price_id         int64
-	Price_name       string
-	Type_id          int64
-	Type_name        string
-	Cooking_tracker  int64
-	Discount_id      int64
-	Discount_name    string
-	Discount_percent int64
-	Price            float64
-	Cook_hash        string
-	Start_time       time.Time
-	End_time         time.Time
-	Fail_id          int64
-	Fail_user_hash   string
-	Fail_comments    string //pq.StringArray
-	Real_foodcost    float64
-	Count            float64
-	Point_hash       string
-	Order_time       time.Time
-	Over_status_id   int64
-	Time_cook        int64
-	Time_fry         int64
-	Set              bool
-	Cook_role        string
+	Metric_id         int64
+	Order_id          int64
+	Id_item           int64
+	Id_parent_item    int64
+	Price_id          int64
+	Price_name        string
+	Type_id           int64
+	Type_name         string
+	Cooking_tracker   int64
+	Discount_id       int64
+	Discount_name     string
+	Discount_percent  int64
+	Price             float64
+	Cook_hash         string
+	Start_time        time.Time
+	End_time          time.Time
+	Fail_id           int64
+	Fail_user_hash    string
+	Fail_comments     string //pq.StringArray
+	Real_foodcost     float64
+	Count             float64
+	Point_hash        string
+	Order_time        time.Time
+	Over_status_id    int64
+	Time_cook         int64
+	Time_fry          int64
+	Set               bool
+	Cook_role         string
+	Code_consist      int64
+	PriceWithDiscount float64
 }
 
+//GetPendingDate struct
 type GetPendingDate struct {
 	Min_date time.Time
 	Min_id   int64
@@ -272,6 +290,7 @@ type GetPendingDate struct {
 //	CreatedTime      time.Time
 //}
 
+//GetDataForMetricsRole struct
 type GetDataForMetricsRole struct {
 	Hash          string
 	Name          string
@@ -287,6 +306,7 @@ type GetDataForMetricsRole struct {
 	Rate          float64
 }
 
+//GetDataForMetricsUser struct
 type GetDataForMetricsUser struct {
 	Hash        string
 	Name        string
@@ -295,6 +315,7 @@ type GetDataForMetricsUser struct {
 	PhoneNumber string
 }
 
+//GetDataForMetricsPoint struct
 type GetDataForMetricsPoint struct {
 	Hash          string
 	HashOrg       string
@@ -309,18 +330,83 @@ type GetDataForMetricsPoint struct {
 	Lon           string
 }
 
+//GetDataForMetricsPlan struct
 type GetDataForMetricsPlan struct {
-	PlanDate  time.Time
-	PointHash string
-	RoleHash  string
-	Counts    pq.Int64Array
+	PlanDate   time.Time
+	PointHash  string
+	RoleHash   string
+	UserCounts pq.Int64Array
+	UserHashes pq.StringArray
 }
 
-type MetricsMetrics struct {
-	Id           interface{}
-	Ownhash      string
-	Date         time.Time
-	Parameter_id int64
+//GetDataForMetricsEvents struct
+type GetDataForMetricsEvents struct {
+	OrderID       int64
+	UserHash      string
+	UserRole      string
+	TypeEvent     int64
+	TimeEvent     time.Time
+	DurationEvent int64
+	Description   string
+	PointHash     string
+}
+
+//GetDataForMetricsBonuses struct
+type GetDataForMetricsBonuses struct {
+	BonusID          int64     `json:"ID"`
+	Phone            string    `json:"Phone"`
+	TransactionBonus int64     `json:"Transaction_bonus"`
+	TypeBonus        int64     `json:"TypeBonus"`
+	Note             string    `json:"Note"`
+	ActionTime       time.Time `json:"Activ_date"`
+}
+
+//GetDataForMetricsUsers struct
+type GetDataForMetricsUsers struct {
+	UserHash        string    `json:"UserHash"`
+	UID             string    `json:"UID"`
+	Password        string    `json:"Password"`
+	LastName        string    `json:"SurName"`
+	FirstName       string    `json:"FirstName"`
+	SecondName      string    `json:"SecondName"`
+	RoleHash        string    `json:"RoleHash"`
+	PointHash       string    `json:"OrgHash"`
+	Phone           string    `json:"PhoneNumber"`
+	INN             string    `json:"INN"`
+	HourRate        float64   `json:"HourRate"`
+	CountRate       float64   `json:"CountRate"`
+	VPNNumber       string    `json:"VPNNumber"`
+	VPNPassword     string    `json:"VPNPassword"`
+	Language        string    `json:"Lang"`
+	Level           int64     `json:"Level"`
+	LevelChangeTime time.Time `json:"LevelChangeTime"`
+	CheckPlan       bool      `json:"Check_plan"`
+	CreateTime      time.Time `json:"CreationTime"`
+	DeleteTime      time.Time `json:"DelDate"`
+	UpdateTime      time.Time `json:"UpdateTime"`
+}
+
+//GetDataForMetricsCashboxShift struct
+type GetDataForMetricsCashboxShift struct {
+	CashRegister int64
+	UserHash     string
+	PointHash    string
+	BeginTime    time.Time
+	EndTime      time.Time
+}
+
+//GetDataForMetricsSklad struct
+type GetDataForMetricsSklad struct {
+	SkladListID int64     `json:"ID"`
+	OrderID     int64     `json:"OrderID"`
+	PriceID     int64     `json:"PriceID"`
+	ProductHash string    `json:"Hash"`
+	ProductName string    `json:"Name"`
+	Count       float64   `json:"Count"`
+	TypeUnits   string    `json:"Uint"`
+	PointHash   string    `json:"OrgHash"`
+	SkladHash   string    `json:"Sklad"`
+	ActionTime  time.Time `json:"ActionTime"`
 }
 
 //////////////////////////////
@@ -340,12 +426,12 @@ type MetricValues interface {
 	Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error
 }
 
-// *** metrics_cashbox ***
+/* *** metrics_cashbox *** */
 func (mc GetDataForMetricsCashbox) HashMethod() string    { return mc.PointHash }
 func (mc GetDataForMetricsCashbox) DateMethod() time.Time { return mc.Action_time }
 func (mc GetDataForMetricsCashbox) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_Cashbox(SMS, m, &mc); err != nil {
-		return fmt.Errorf("Transaction_Insert_Cashbox: %v", err)
+	if err := Transaction.TransactionInsertCashbox(SMS, m, &mc); err != nil {
+		return fmt.Errorf("TransactionInsertCashbox: %v", err)
 	}
 	return nil
 }
@@ -354,8 +440,8 @@ func (mc GetDataForMetricsCashbox) Insert(SMS *SMS, Transaction *Transaction, m 
 func (mo GetDataForMetricsOrders) HashMethod() string    { return mo.Point_hash }
 func (mo GetDataForMetricsOrders) DateMethod() time.Time { return mo.Creator_time }
 func (mo GetDataForMetricsOrders) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_OrdersInfo(SMS, m, &mo); err != nil {
-		return fmt.Errorf("Transaction_Insert_OrdersInfo: %v", err)
+	if err := Transaction.TransactionInsertOrdersInfo(SMS, m, &mo); err != nil {
+		return fmt.Errorf("TransactionInsertOrdersInfo: %v", err)
 	}
 	return nil
 }
@@ -364,8 +450,8 @@ func (mo GetDataForMetricsOrders) Insert(SMS *SMS, Transaction *Transaction, m *
 func (mol GetDataForMetricsOrdersLists) HashMethod() string    { return mol.Point_hash }
 func (mol GetDataForMetricsOrdersLists) DateMethod() time.Time { return mol.Order_time }
 func (mol GetDataForMetricsOrdersLists) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_OrdersListInfo(SMS, m, &mol); err != nil {
-		return fmt.Errorf("Transaction_Insert_OrdersListInfo: %v", err)
+	if err := Transaction.TransactionInsertOrdersListInfo(SMS, m, &mol); err != nil {
+		return fmt.Errorf("TransactionInsertOrdersListInfo: %v", err)
 	}
 	return nil
 }
@@ -374,8 +460,8 @@ func (mol GetDataForMetricsOrdersLists) Insert(SMS *SMS, Transaction *Transactio
 func (v GetDataForMetricsRole) HashMethod() string    { return v.Hash }
 func (v GetDataForMetricsRole) DateMethod() time.Time { return v.CreateTime }
 func (v GetDataForMetricsRole) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_Role(SMS, m, &v); err != nil {
-		return fmt.Errorf("Transaction_Insert_Role: %v", err)
+	if err := Transaction.TransactionInsertRole(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertRole: %v", err)
 	}
 	return nil
 }
@@ -384,8 +470,8 @@ func (v GetDataForMetricsRole) Insert(SMS *SMS, Transaction *Transaction, m *Met
 func (v GetDataForMetricsUser) HashMethod() string    { return v.Hash }
 func (v GetDataForMetricsUser) DateMethod() time.Time { return time.Time{} }
 func (v GetDataForMetricsUser) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_User(SMS, m, &v); err != nil {
-		return fmt.Errorf("Transaction_Insert_User: %v", err)
+	if err := Transaction.TransactionInsertUser(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertUser: %v", err)
 	}
 	return nil
 }
@@ -394,8 +480,8 @@ func (v GetDataForMetricsUser) Insert(SMS *SMS, Transaction *Transaction, m *Met
 func (v GetDataForMetricsPlan) HashMethod() string    { return v.PointHash }
 func (v GetDataForMetricsPlan) DateMethod() time.Time { return v.PlanDate }
 func (v GetDataForMetricsPlan) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_Plan(SMS, m, &v); err != nil {
-		return fmt.Errorf("Transaction_Insert_Plan: %v", err)
+	if err := Transaction.TransactionInsertPlan(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertPlan: %v", err)
 	}
 	return nil
 }
@@ -404,8 +490,59 @@ func (v GetDataForMetricsPlan) Insert(SMS *SMS, Transaction *Transaction, m *Met
 func (v GetDataForMetricsPoint) HashMethod() string    { return v.Hash }
 func (v GetDataForMetricsPoint) DateMethod() time.Time { return v.CreateTime }
 func (v GetDataForMetricsPoint) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
-	if err := Transaction.Transaction_Insert_Point(SMS, m, &v); err != nil {
-		return fmt.Errorf("Transaction_Insert_Point: %v", err)
+	if err := Transaction.TransactionInsertPoint(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertPoint: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_events ***
+func (v GetDataForMetricsEvents) HashMethod() string    { return v.UserHash }
+func (v GetDataForMetricsEvents) DateMethod() time.Time { return v.TimeEvent }
+func (v GetDataForMetricsEvents) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.TransactionInsertEvents(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertEvents: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_bonuses ***
+func (v GetDataForMetricsBonuses) HashMethod() string    { return v.Phone }
+func (v GetDataForMetricsBonuses) DateMethod() time.Time { return v.ActionTime }
+func (v GetDataForMetricsBonuses) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.TransactionInsertBonuses(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertBonuses: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_users ***
+func (v GetDataForMetricsUsers) HashMethod() string    { return v.UserHash }
+func (v GetDataForMetricsUsers) DateMethod() time.Time { return v.UpdateTime }
+func (v GetDataForMetricsUsers) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.TransactionInsertUsers(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertUsers: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_cashbox_shift ***
+func (v GetDataForMetricsCashboxShift) HashMethod() string    { return v.PointHash }
+func (v GetDataForMetricsCashboxShift) DateMethod() time.Time { return v.BeginTime }
+func (v GetDataForMetricsCashboxShift) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	if err := Transaction.TransactionInsertCashboxShift(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertCashboxShift: %v", err)
+	}
+	return nil
+}
+
+// *** metrics_sklad ***
+func (v GetDataForMetricsSklad) HashMethod() string    { return v.PointHash }
+func (v GetDataForMetricsSklad) DateMethod() time.Time { return v.ActionTime }
+func (v GetDataForMetricsSklad) Insert(SMS *SMS, Transaction *Transaction, m *MetricsMetrics) error {
+	//v.PriceID = 0
+	if err := Transaction.TransactionInsertSklad(SMS, m, &v); err != nil {
+		return fmt.Errorf("TransactionInsertSklad: %v", err)
 	}
 	return nil
 }

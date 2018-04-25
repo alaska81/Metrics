@@ -179,16 +179,18 @@ func Select(m *structures.Message, index int) error {
 		switch m.Tables[index].TypeParameter {
 		case "ReportSaleNewByInterval":
 			answer = &structures.ReportSale{}
-		case "ReportSummOnTypePayments":
-			answer = &structures.ReportSummOnTypePayments{}
 		case "ReportCashboxPrepayByInterval":
 			answer = &structures.ReportCashboxPrepay{}
 		case "ReportCashboxPostpayByInterval":
 			answer = &structures.ReportCashboxPostpay{}
-		//case "ReportCashboxReturnByInterval":
-		//	answer = &structures.ReportCashboxReturn{}
+		case "ReportCashboxReturnByInterval":
+			answer = &structures.ReportCashboxReturn{}
 		case "ReportCashboxNewByInterval":
 			answer = &structures.ReportCashbox{}
+		case "ReportSummOnTypePayments":
+			answer = &structures.ReportSummOnTypePayments{}
+		case "ReportCashboxPointlByInterval":
+			answer = &structures.ReportCashboxPointlByInterval{}
 		case "ReportOperatorsNewByInterval":
 			answer = &structures.ReportOperator{}
 		case "ReportCouriersNewByInterval":
@@ -200,17 +202,35 @@ func Select(m *structures.Message, index int) error {
 		case "ReportCancelOrdersNewByInterval":
 			answer = &structures.ReportCancelOrders{}
 		case "ReportOrdersOnTime":
-			answer = &structures.ReportOrdersOnTime{}
+			answer = &structures.ReportOrdersOn{}
+		case "ReportOrdersOnDay":
+			answer = &structures.ReportOrdersOn{}
+		case "ReportOrdersByInterval":
+			answer = &structures.ReportOrdersByInterval{}
 		case "ReportPredictCouriersOnTime":
-			answer = &structures.ReportPredictCouriersOnTime{}
+			answer = &structures.ReportPredictOnTime{}
 		case "ReportPredictCollectorOnTime":
-			answer = &structures.ReportPredictCollectorOnTime{}
+			answer = &structures.ReportPredictOnTime{}
 		case "ReportAvgTimeRelayOnTime":
 			answer = &structures.ReportAvgTimeRelayOnTime{}
 		case "ReportWorkloadOnTime":
 			answer = &structures.ReportWorkloadOnTime{}
 		case "ReportCookByInterval":
 			answer = &structures.ReportCook{}
+		case "ReportLastUpdateBySTId":
+			answer = &structures.ReportLastUpdate{}
+		case "ReportPersonalByInterval":
+			answer = &structures.ReportPersonal{}
+		case "ReportCookByHashDateNum":
+			answer = &structures.ReportCookByHashDateNum{}
+		case "ReportLaborCostOnCook":
+			answer = &structures.ReportLaborCost{}
+		case "ReportLaborCostOnCollector":
+			answer = &structures.ReportLaborCost{}
+		case "ReportBonusesOnDay":
+			answer = &structures.ReportBonusesOn{}
+		case "ReportBonusesOnTime":
+			answer = &structures.ReportBonusesOn{}
 		default:
 			return errors.New("Неизвестная таблица: " + m.Tables[index].TypeParameter)
 		}

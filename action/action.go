@@ -120,21 +120,6 @@ func InitMetrics() {
 //	}
 //}
 
-func (SM *StartMetrics) StartMetrics() error {
-
-	if err := SM.GetTables(); err != nil {
-		return err
-	}
-
-	log.Println("Время старта метрик инициализировано:", time.Now())
-	for true {
-		go SM.StartComponentMetrics()
-		time.Sleep(time.Minute * 60)
-	}
-
-	return nil
-}
-
 func (SM *StartMetrics) GetTables() error {
 	Mutex = NewMutex()
 	Rows, err := postgresql.Requests.Query("Select.metrics_link_step.")
@@ -147,7 +132,7 @@ func (SM *StartMetrics) GetTables() error {
 		if err = Rows.Scan(&SMS.MP.Min_Step_ID,
 			&SMS.MSTEP.ID, &SMS.MSTEP.Name, &SMS.MSTEP.Value, &SMS.MSTEP.Duration,
 			&SMS.MSTEPT.ID, &SMS.MSTEPT.Name,
-			&SMS.MP.ID, &SMS.MP.ServiceTableId, &SMS.MP.Type_Mod_ID, &SMS.MP.Own_ID, &SMS.MP.PendingDate, &SMS.MP.PendingId, &SMS.MP.Protocol_version, &SMS.MP.Update_allow,
+			&SMS.MP.ID, &SMS.MP.ServiceTableId, &SMS.MP.Timeout, &SMS.MP.Own_ID, &SMS.MP.PendingDate, &SMS.MP.PendingId, &SMS.MP.Protocol_version, &SMS.MP.Update_allow, &SMS.MP.UpdateAt,
 			&SMS.MST.ID, &SMS.MST.Query, &SMS.MST.TableName, &SMS.MST.TypeParameter, &SMS.MST.Service_ID, &SMS.MST.Activ,
 			&SMS.MS.ID, &SMS.MS.Name, &SMS.MS.IP); err != nil {
 			return err
@@ -156,6 +141,21 @@ func (SM *StartMetrics) GetTables() error {
 		SM.SMS_ARRAY = append(SM.SMS_ARRAY, SMS)
 		Mutex.AddMutex(SMS.MP.ServiceTableId)
 	}
+	return nil
+}
+
+func (SM *StartMetrics) StartMetrics() error {
+
+	if err := SM.GetTables(); err != nil {
+		return err
+	}
+
+	log.Println("Метрики инициализированы:", time.Now())
+	for true {
+		go SM.StartComponentMetrics()
+		time.Sleep(time.Minute * 30)
+	}
+
 	return nil
 }
 
@@ -171,16 +171,20 @@ func (SM *StartMetrics) StartComponentMetrics() {
 
 			err := Go_Routines(SMS)
 			if err != nil {
-				log.Println("ERROR: ", fmt.Errorf("Go_Routines: %v", err))
-				fmt.Println("ERROR: ", fmt.Errorf("Go_Routines: %v", err))
+				log.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
+				fmt.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
+				time.Sleep(time.Minute * 10)
+				return
 			}
 
 		}(&SM.SMS_ARRAY[KEY])
+
 	}
 }
 
 func Go_Routines(SMS *postgresql.SMS) error {
 	Mutex.Lock(SMS.MP.ServiceTableId, "local")
+	defer Mutex.Unlock(SMS.MP.ServiceTableId, "local")
 
 	log.Println("МЕТРИКА: ", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
 
@@ -202,22 +206,29 @@ func Go_Routines(SMS *postgresql.SMS) error {
 	// Protocol_version == 1
 	if SMS.MP.Protocol_version == 1 {
 		Q := structures.QueryMessage{Query: SMS.MST.Query, Table: SMS.MST.TableName, TypeParameter: SMS.MST.TypeParameter, Limit: 99999, Offset: 0}
-		// Временно Values по протоколу 1 только для План-Табель PointRoleCountByTime
-		if SMS.MST.ID == 78 {
+
+		// Values по протоколу 1 для План-Табель (PointRoleCountByTime), Бонусы (LogTransactionBonus), Склад (Rashod)
+		services := map[int64]int64{78: 1, 88: 1, 95: 1}
+
+		if _, ok := services[SMS.MST.ID]; ok {
+			//if SMS.MST.ID == 78 || SMS.MST.ID == 88 {
 			Q.Values = append(Q.Values, SMS.MP.PendingDate)
+			//Q.Values = append(Q.Values, "2018-04-22T21:12:35Z")
 		}
 		//---
 		log.Println("Запрос на:", SMS.MS.Name, "; Message:", Q)
 
-		Answer_Message, err := connect.SelectRows(&conn, Q)
+		AnswerMessage, err := connect.SelectRows(&conn, Q)
 		if err != nil {
-			return fmt.Errorf("SelectMessage: %v", err)
+			return fmt.Errorf("SelectRows: %v", err)
 		}
+
+		log.Println("***reply:", AnswerMessage)
 
 		M = structures.Message{Query: SMS.MST.Query}
 		Table := structures.Table{Name: SMS.MST.TableName, TypeParameter: SMS.MST.TypeParameter}
 
-		for _, val := range Answer_Message {
+		for _, val := range AnswerMessage {
 			var M interface{}
 			if err := json.Unmarshal([]byte(val), &M); err != nil {
 				return err
@@ -225,7 +236,7 @@ func Go_Routines(SMS *postgresql.SMS) error {
 			Table.Values = append(Table.Values, M)
 		}
 
-		//Table.Values = append(Table.Values, Answer_Message)
+		//Table.Values = append(Table.Values, AnswerMessage)
 		M.Tables = append(M.Tables, Table)
 
 		//fmt.Println("Answer Message:", M)
@@ -260,8 +271,6 @@ func Go_Routines(SMS *postgresql.SMS) error {
 		}
 	}
 
-	Mutex.Unlock(SMS.MP.ServiceTableId, "local")
-
 	return nil
 }
 
@@ -269,9 +278,15 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 	var metrics postgresql.MetricsMetrics
 	var values postgresql.MetricValues
 
+	var pendingDate time.Time = SMS.MP.PendingDate
+	var pendingID int64 = SMS.MP.PendingId
+	var updateAt time.Time
+
 	switch SMS.MST.TableName + "." + SMS.MST.TypeParameter {
 	case "GetDataForMetricsNewCashbox.RangeCashbox":
 		values = &postgresql.GetDataForMetricsCashbox{}
+	case "GetDataForMetricsCashboxShift.RangeCashbox":
+		values = &postgresql.GetDataForMetricsCashboxShift{}
 	case "GetDataForMetricsNewOrders.RangeOrders":
 		values = &postgresql.GetDataForMetricsOrders{}
 	case "GetDataForMetricsNewOrdersLists.RangeOrdersLists":
@@ -280,10 +295,18 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		values = &postgresql.GetDataForMetricsRole{}
 	case "UserGlobal.":
 		values = &postgresql.GetDataForMetricsUser{}
+	case "User.":
+		values = &postgresql.GetDataForMetricsUsers{}
 	case "Point.All":
 		values = &postgresql.GetDataForMetricsPoint{}
 	case "PointRoleCountByTime.Date":
 		values = &postgresql.GetDataForMetricsPlan{}
+	case "GetDataForMetricsEvents.RangeEvents":
+		values = &postgresql.GetDataForMetricsEvents{}
+	case "LogTransactionBonus.Date":
+		values = &postgresql.GetDataForMetricsBonuses{}
+	case "Rashod.SkladDate":
+		values = &postgresql.GetDataForMetricsSklad{}
 	default:
 		//log.Println("Сбор этой метрики не реализован: ", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
 		return errors.New("Сбор этой метрики не реализован: " + SMS.MST.TableName + "." + SMS.MST.TypeParameter)
@@ -327,18 +350,29 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 		fmt.Printf("\r%s\r", "                                                                                ")
 		fmt.Printf("%v: %v / %v | %v / 500", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values), SMS.MP.CountInserted)
 
-		if SMS.MP.PendingDate.String()[:19] < values.DateMethod().String()[:19] {
-			SMS.MP.PendingDate = values.DateMethod()
+		if pendingDate.String()[:19] < values.DateMethod().String()[:19] {
+			pendingDate = values.DateMethod()
 		}
-		//fmt.Println("*******", SMS.MP.PendingDate)
+		//fmt.Println("*******", pendingDate)
 
-		SMS.MP.PendingId = 0
+		pendingID = 0
+
+		// if k%500 == 0 {
+		// 	if err := redis.CopyKeys(SMS.MP.ID); err != nil {
+		// 		return fmt.Errorf("redis.CopyKeys:(%v) %v", SMS.MP.ID, err)
+		// 	}
+		// }
 
 		if SMS.MP.CountInserted >= 500 {
-			fmt.Print(" begin commit")
+			log.Printf("%v: %v / %v | %v / 500", SMS.MST.TableName, (k + 1), len(M.Tables[0].Values), SMS.MP.CountInserted)
+			fmt.Print(" begin commit \n")
 
 			if err := Transaction.Commit(); err != nil {
 				return fmt.Errorf("Transaction.Commit: %v", err)
+			}
+
+			if err := redis.CopyKeys(SMS.MP.ID); err != nil {
+				return fmt.Errorf("redis.CopyKeys:(%v) %v", SMS.MP.ID, err)
 			}
 
 			if err := Transaction.Begin(); err != nil {
@@ -375,26 +409,32 @@ func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
 			return fmt.Errorf("json unmarshal: %v", err)
 		}
 
-		SMS.MP.PendingDate = PD.Min_date
-		SMS.MP.PendingId = PD.Min_id
-
+		pendingDate = PD.Min_date
+		pendingID = PD.Min_id
 	}
 
+	updateAt = time.Now()
+
 	// Обновляем инфу в metrics_parameters
-	if err := Transaction.Transaction_QTTV_One(false, "Update", "metrics_parameters", "PendingDateAndId", SMS.MP.ServiceTableId, SMS.MP.PendingDate.String()[:19], SMS.MP.PendingId); err != nil {
+	if err := Transaction.Transaction_QTTV_One(false, "Update", "metrics_parameters", "PendingDateAndId", SMS.MP.ServiceTableId, pendingDate, pendingID, updateAt); err != nil {
 		return fmt.Errorf("Update.metrics_parameters.PendingDateAndId: %v", err)
 	}
 
-	log.Println("Update metrics_parameters:", SMS.MP.PendingDate.String()[:19], "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
-	fmt.Println("\nUpdate metrics_parameters:", SMS.MP.PendingDate.String()[:19], "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter)
+	log.Println("Update metrics_parameters:", pendingDate, "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter, "- at:", updateAt)
+	fmt.Println("\nUpdate metrics_parameters:", pendingDate, "для", SMS.MST.TableName+"."+SMS.MST.TypeParameter, "- at:", updateAt)
 
 	/*Конец Транзакции*/
 	if err := Transaction.Commit(); err != nil {
 		return fmt.Errorf("Transaction.Commit: %v", err)
 	}
 
+	SMS.MP.CountInserted = 0
+	SMS.MP.PendingDate = pendingDate
+	SMS.MP.PendingId = pendingID
+	SMS.MP.UpdateAt = updateAt
+
 	if err := redis.SwitchKeys(SMS.MP.ID); err != nil {
-		return fmt.Errorf("redis.SwitchKeys:(%s) %v", SMS.MP.ID, err)
+		return fmt.Errorf("redis.SwitchKeys:(%v) %v", SMS.MP.ID, err)
 	}
 
 	log.Println("*** END", SMS.MST.TableName+"."+SMS.MST.TypeParameter, " Сбор отработан.")
@@ -444,29 +484,29 @@ func SelectMessage(conn *net.Conn, M *structures.Message) error {
 
 	Bytes1, err := json.Marshal(M)
 	if err != nil {
-		return err
+		return fmt.Errorf("json.Marshal: %v", err)
 	}
 	if err, _ := fn.Send([]byte(string(Bytes1)), *conn); err != nil {
-		return err
+		return fmt.Errorf("Send: %v", err)
 	}
 	reply, err := fn.Read(conn, false)
-	//log.Println("***reply for ", M, ":", string(reply))
+	log.Println("***reply for ", M, ":", string(reply))
 	if err := json.Unmarshal([]byte(reply), &M); err != nil {
-		return err
+		return fmt.Errorf("json.Unmarshal: %v", err)
 	}
 
 	return nil
 }
 
-func TypeTransform(in *interface{}, out *interface{}) error {
+// func TypeTransform(in *interface{}, out *interface{}) error {
 
-	j, err := json.Marshal(in)
-	if err != nil {
-		return fmt.Errorf("json marshal: %v", err)
-	}
-	if err := json.Unmarshal(j, &out); err != nil {
-		return fmt.Errorf("json unmarshal: %v", err)
-	}
+// 	j, err := json.Marshal(in)
+// 	if err != nil {
+// 		return fmt.Errorf("json marshal: %v", err)
+// 	}
+// 	if err := json.Unmarshal(j, &out); err != nil {
+// 		return fmt.Errorf("json unmarshal: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

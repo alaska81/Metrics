@@ -71,3 +71,14 @@ func SwitchKeys(key interface{}) error {
 
 	return nil
 }
+
+func CopyKeys(key interface{}) error {
+	if rclient.Exists(fmt.Sprint(key)+"_tmp").Val() == 1 {
+		err := rclient.SUnionStore(fmt.Sprint(key), fmt.Sprint(key), fmt.Sprint(key)+"_tmp").Err()
+		if err != nil {
+			return fmt.Errorf("CopyKeys: %v", err)
+		}
+	}
+
+	return nil
+}

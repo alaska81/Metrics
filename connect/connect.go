@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 
 	"MetricsNew/config"
@@ -97,7 +97,7 @@ func SelectMessageOLD(conn *net.Conn, QM, TQM interface{}) (structures.Message, 
 		return Answer, err
 	}
 	reply, err := fn.Read(conn, false)
-	log.Println("reply:", string(reply))
+	//log.Println("reply:", string(reply))
 	if err := json.Unmarshal([]byte(reply), &Answer); err != nil {
 		return Answer, err
 	}
@@ -111,15 +111,16 @@ func SelectRows(conn *net.Conn, QM interface{}) ([]string, error) {
 	var Answer []string
 	Bytes1, err := json.Marshal(QM)
 	if err != nil {
-		return Answer, err
+		return Answer, fmt.Errorf("json.Marshal: %v", err)
 	}
 	if err, _ := fn.Send([]byte(string(Bytes1)), *conn); err != nil {
-		return Answer, err
+		return Answer, fmt.Errorf("Send: %v", err)
 	}
 	for true {
 		reply, err := fn.Read(conn, true)
+		//log.Println("reply SelectRows:", string(reply))
 		if err != nil {
-			return Answer, err
+			return Answer, fmt.Errorf("Read: %v", err)
 		}
 		if reply == "EOF" {
 			break
