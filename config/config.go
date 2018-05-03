@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -44,10 +45,36 @@ type Configurations struct {
 	Word         string
 	Using_Domain string
 
-	Redis_Addr		string
-	Redis_Password	string
-	Redis_DB		int
+	Redis_Addr     string
+	Redis_Password string
+	Redis_DB       int
 }
+
+// type Log interface {
+// 	toChannel(values ...interface{})
+// }
+
+type Channel struct {
+	c chan []interface{}
+}
+
+type ChanMessaging struct {
+	c chan []interface{}
+}
+
+type ChanErrors struct {
+	c chan []interface{}
+}
+
+var (
+	logMessaging *log.Logger
+	logErrors    *log.Logger
+)
+
+// var (
+// 	ChanMessaging = make(chan []interface{})
+// 	ChanErrors    = make(chan []interface{})
+// )
 
 func (c *Configurations) getConfigurations() error {
 
@@ -118,6 +145,18 @@ func init() {
 		go RecLog()
 	}
 	Sertification()
+
+	go formChannel()
+
+	//var log Log
+	ChanMessaging.c = make(chan []interface{})
+	ChanErrors.c = make(chan []interface{})
+
+	// log := &Channel{ChanErrors}
+	// log.toChannel("aa")
+	// log.toChannel("bbb")
+	// log = &Channel{ChanMessaging}
+	// log.toChannel("ccc")
 }
 
 func RecLog() {
@@ -133,18 +172,60 @@ func RecLog() {
 }
 
 func StartLog() {
-	//Подключение к лог файлу.
-	_, err := os.Stat("./log/")
 	LogFile.Close()
+
+	_, err := os.Stat("./log/")
 	if os.IsNotExist(err) {
 		os.MkdirAll("./log/", 0777)
-		LogFile, err = os.OpenFile("./log/"+time.Now().String()[:10]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	} else {
-		LogFile, err = os.OpenFile("./log/"+time.Now().String()[:10]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	}
+
+	LogFile, err = os.OpenFile("./log/"+time.Now().String()[:10]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Panic("Logfile not found!:", err)
 	}
 	log.SetOutput(LogFile)
+
+	LogFile, err = os.OpenFile("./log/messaging "+time.Now().String()[:10]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logMessaging = log.New(LogFile, "", log.Ldate|log.Ltime|log.Lshortfile)
+
+	LogFile, err = os.OpenFile("./log/errors "+time.Now().String()[:10]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logErrors = log.New(LogFile, "", log.Ldate|log.Ltime|log.Lshortfile)
+
 	log.Println("_______NEW_START_OF_SERVER_______")
+	logMessaging.Println("_______NEW_START_OF_SERVER_______")
+	logErrors.Println("_______NEW_START_OF_SERVER_______")
+}
+
+func formChannel() {
+	for {
+		select {
+		case x, ok := <-ChanMessaging:
+			if !ok {
+				ChanMessaging = nil
+				continue
+			}
+			logMessaging.Println(x)
+
+		case x, ok := <-ChanErrors:
+			if !ok {
+				ChanErrors = nil
+				continue
+			}
+			logErrors.Println(x)
+		}
+	}
+}
+
+func (channel *Channel) toChannel(values ...interface{}) {
+	fmt.Println(values)
+	if channel.c != nil {
+		channel.c <- values
+	}
+}
+
+func (channel *ChanMessaging) toChannel(values ...interface{}) {
+	fmt.Println(values)
+	if channel.c != nil {
+		channel.c <- values
+	}
 }

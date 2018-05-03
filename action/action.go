@@ -19,6 +19,7 @@ import (
 	fn "MetricsNew/function"
 	"MetricsNew/postgresql"
 	"MetricsNew/redis"
+	"MetricsNew/sms"
 
 	"MetricsNew/structures"
 
@@ -151,17 +152,20 @@ func (SM *StartMetrics) StartMetrics() error {
 	}
 
 	log.Println("Метрики инициализированы:", time.Now())
-	for true {
-		go SM.StartComponentMetrics()
-		time.Sleep(time.Minute * 30)
-	}
+	// for true {
+	// 	go SM.StartComponentMetrics()
+	// 	time.Sleep(time.Minute * 30)
+	// }
+	SM.StartComponentMetrics()
 
 	return nil
 }
 
 func (SM *StartMetrics) StartComponentMetrics() {
+	var isSendingSMS = make(map[int64]bool)
+
 	log.Println("SM.SMS_ARRAY :", SM.SMS_ARRAY)
-	for KEY, _ := range SM.SMS_ARRAY { //Бежим по всем
+	for KEY := range SM.SMS_ARRAY { //Бежим по всем
 		if !SM.SMS_ARRAY[KEY].MST.Activ { //Проверка на активность метрики
 			continue
 		}
@@ -169,12 +173,33 @@ func (SM *StartMetrics) StartComponentMetrics() {
 		go func(SMS *postgresql.SMS) {
 			time.Sleep(time.Second * time.Duration(rand.Intn(180)))
 
-			err := Go_Routines(SMS)
-			if err != nil {
-				log.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
-				fmt.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
-				time.Sleep(time.Minute * 10)
-				return
+			isSendingSMS[SMS.MP.ID] = false
+
+			for true {
+				err := Go_Routines(SMS)
+				if err != nil {
+					log.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
+					fmt.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("Go_Routines: %v", err))
+
+					if isSendingSMS[SMS.MP.ID] == false {
+						var sms sms.SMS
+						sms.Phone = "79058514789"
+						sms.Message = time.Now().Format("2006-01-02 15:04:05") + " ERROR: " + err.Error()
+						log.Println("SMS: ", SMS.MST.TableName)
+						// if err := sms.Send(); err != nil {
+						// 	log.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("sms.Send(): %v", err))
+						// 	fmt.Println(time.Now(), "!!!ERROR: ", fmt.Errorf("sms.Send(): %v", err))
+						// }
+
+						isSendingSMS[SMS.MP.ID] = true
+					}
+
+					time.Sleep(time.Minute * 10)
+					continue
+				}
+
+				isSendingSMS[SMS.MP.ID] = false
+				time.Sleep(time.Minute * time.Duration(SMS.MP.Timeout))
 			}
 
 		}(&SM.SMS_ARRAY[KEY])
@@ -275,6 +300,8 @@ func Go_Routines(SMS *postgresql.SMS) error {
 }
 
 func AddMetricsInDB(SMS *postgresql.SMS, M *structures.Message) error {
+	defer Recover()
+
 	var metrics postgresql.MetricsMetrics
 	var values postgresql.MetricValues
 

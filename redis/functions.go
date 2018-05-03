@@ -1,4 +1,3 @@
-// functions
 package redis
 
 import (
